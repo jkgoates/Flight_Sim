@@ -8,6 +8,8 @@ module helper_m
     real,parameter :: PI4 = PI*0.25
     real,parameter :: g_ssl = 9.80665 ! Standard Gravity at sea level 
     real,parameter :: r_ez = 6356766.0 ! US standard atmosphere earth radius in meters
+    real,parameter :: R_gas = 287.0528
+    real,parameter :: gamma = 1.4
     
 contains
     
@@ -185,18 +187,44 @@ contains
         real, intent(inout) :: Z, T, P, rho, a
 
         real :: Z_i(8), Z_i1(8), T_i(8), Tp_i(8), P_i(8)
+        integer :: i
 
         ! TABLE DECLARATION DO NOT EDIT
         Z_i = [0., 11000., 20000., 32000., 47000., 52000., 61000., 79000.]
         Z_i1 = [11000., 20000., 32000., 47000., 52000., 61000., 79000., 90000.]
         T_i = [288.150, 216.650, 216.650, 228.650, 270.650, 270.650, 252.650, 180.650]
         Tp_i = [-6.5, 0.0, 1.0, 2.8, 0.0, -2.0, -4.0, 0.0]
+        P_i = [1.01325e5, 2.26320318222212e4, 5.47487352827083e3, 8.68014769086723e2, &
+                1.10905588989225e2, 5.90005242789244e1, 1.82099249050177e1, 1.03770445489203]
 
         ! Calculate geopotential altitude
         Z = r_ez*h/(r_ez + h)
 
         ! Calculate pressure
-        
+        do i = 1, 8
+
+            if (Z >= Z_i(i) .and. Z < Z_i1(i)) then
+
+                T = T_i(i) + 0.001*Tp_i(i)*(Z - Z_i(i))
+
+                if (Tp_i(i) == 0) then
+                    P = P_i(i)*exp(-g_ssl*(Z - Z_i(i))/(R_gas * T_i(i)))
+                else
+                    P = P_i(i)*(T/T_i(i))**(-g_ssl/(R_gas * 0.001*Tp_i(i)))
+                end if 
+
+                rho = P/(R_gas*T)
+
+                a = sqrt(gamma*R_gas*T)
+
+                exit
+            else
+                continue
+            end if
+
+
+        end do
+
 
     end subroutine std_atm_SI
 
