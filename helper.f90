@@ -39,7 +39,7 @@ contains
 
         t(1) = -vec1(1)*q1(2) - vec1(2)*q1(3) - vec1(3)*q1(4)
         t(2) = vec1(1)*q1(1) + vec1(2)*q1(4) - vec1(3)*q1(3)
-        t(3) = vec1(1)*q1(4) + vec1(2)*q1(1) + vec1(3)*q1(2)
+        t(3) = -vec1(1)*q1(4) + vec1(2)*q1(1) + vec1(3)*q1(2)
         t(4) = vec1(1)*q1(3) - vec1(2)*q1(2) + vec1(3)*q1(1)
 
         vec2(1) = q1(1)*t(2) - q1(2)*t(1) - q1(3)*t(4) + q1(4)*t(3)
@@ -60,7 +60,7 @@ contains
 
         t(1) = vec1(1)*q1(2) + vec1(2)*q1(3) + vec1(3)*q1(4)
         t(2) = vec1(1)*q1(1) - vec1(2)*q1(4) + vec1(3)*q1(3)
-        t(3) = vec1(1)*q1(4) + vec1(2)*q1(1) - vec1(3)*q1(2)
+        t(3) = -vec1(1)*q1(4) + vec1(2)*q1(1) - vec1(3)*q1(2)
         t(4) = -vec1(1)*q1(3) + vec1(2)*q1(2) + vec1(3)*q1(1)
 
         vec2(1) = q1(1)*t(2) + q1(2)*t(1) + q1(3)*t(4) - q1(4)*t(3)
@@ -92,20 +92,35 @@ contains
         !q1(3) = cos(e1(1)*0.5)*sin(e1(2)*0.5)*cos(e1(3)*0.5) + sin(e1(1)*0.5)*cos(e1(2)*0.5)*sin(e1(3)*0.5)
         !q1(4) = cos(e1(1)*0.5)*cos(e1(2)*0.5)*sin(e1(3)*0.5) - sin(e1(1)*0.5)*sin(e1(2)*0.5)*cos(e1(3)*0.5)
 
-        real :: s(3), c(3)
+        !real :: s(3), c(3)
 
-        s(1) = sin(e1(1)*0.5)
-        s(2) = sin(e1(2)*0.5)
-        s(3) = sin(e1(3)*0.5)
+        !s(1) = sin(e1(1)*0.5)
+        !s(2) = sin(e1(2)*0.5)
+        !s(3) = sin(e1(3)*0.5)
 
-        c(1) = cos(e1(1)*0.5)
-        c(2) = cos(e1(2)*0.5)
-        c(3) = cos(e1(3)*0.5)
+        !c(1) = cos(e1(1)*0.5)
+        !c(2) = cos(e1(2)*0.5)
+        !c(3) = cos(e1(3)*0.5)
 
-        q1(1) = c(1)*c(2)*c(3) + s(1)*s(2)*s(3)    
-        q1(2) = s(1)*c(2)*c(3) - c(1)*s(2)*s(3)    
-        q1(3) = c(1)*s(2)*c(3) + s(1)*c(2)*s(3)    
-        q1(4) = c(1)*c(2)*s(3) - s(1)*s(2)*c(3)    
+        !q1(1) = c(1)*c(2)*c(3) + s(1)*s(2)*s(3)    
+        !q1(2) = s(1)*c(2)*c(3) - c(1)*s(2)*s(3)    
+        !q1(3) = c(1)*s(2)*c(3) + s(1)*c(2)*s(3)    
+        !q1(4) = c(1)*c(2)*s(3) - s(1)*s(2)*c(3)    
+
+        real :: cphi, ctheta, cpsi, sphi, stheta, spsi
+
+        sphi = sin(e1(1)*0.5)
+        stheta = sin(e1(2)*0.5)
+        spsi = sin(e1(3)*0.5)
+
+        cphi = cos(e1(1)*0.5)
+        ctheta = cos(e1(2)*0.5)
+        cpsi = cos(e1(3)*0.5)
+
+        q1(1) = cphi*ctheta*cpsi + sphi*stheta*spsi    
+        q1(2) = sphi*ctheta*cpsi - cphi*stheta*spsi    
+        q1(3) = cphi*stheta*cpsi + sphi*ctheta*spsi    
+        q1(4) = cphi*ctheta*spsi - sphi*stheta*cpsi    
         
     end function euler_to_quat
 
@@ -160,6 +175,30 @@ contains
         g = meters_to_feet(gravity_SI(feet_to_meters(h_ft)))
         
     end function gravity_English
+
+
+    subroutine std_atm_SI(h, Z, T, P, rho, a)
+
+        implicit none
+
+        real, intent(in) :: h
+        real, intent(inout) :: Z, T, P, rho, a
+
+        real :: Z_i(8), Z_i1(8), T_i(8), Tp_i(8), P_i(8)
+
+        ! TABLE DECLARATION DO NOT EDIT
+        Z_i = [0., 11000., 20000., 32000., 47000., 52000., 61000., 79000.]
+        Z_i1 = [11000., 20000., 32000., 47000., 52000., 61000., 79000., 90000.]
+        T_i = [288.150, 216.650, 216.650, 228.650, 270.650, 270.650, 252.650, 180.650]
+        Tp_i = [-6.5, 0.0, 1.0, 2.8, 0.0, -2.0, -4.0, 0.0]
+
+        ! Calculate geopotential altitude
+        Z = r_ez*h/(r_ez + h)
+
+        ! Calculate pressure
+        
+
+    end subroutine std_atm_SI
 
 
     !!! UNIT CONVERSIONS !!!
