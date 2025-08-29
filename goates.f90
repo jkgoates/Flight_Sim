@@ -1,4 +1,4 @@
-module helper_m
+module goates_m
 
     implicit none
 
@@ -16,13 +16,15 @@ module helper_m
     real,parameter :: kg_m3_to_slug_ft3 = 1/515.379   
 
     ! ATMOSPHERE TABLES
-
     real, parameter :: Z_i(8)= [0., 11000., 20000., 32000., 47000., 52000., 61000., 79000.]
     real, parameter :: Z_i1(8) = [11000., 20000., 32000., 47000., 52000., 61000., 79000., 90000.]
     real, parameter :: T_i(8)= [288.150, 216.650, 216.650, 228.650, 270.650, 270.650, 252.650, 180.650]
     real, parameter :: Tp_i(8) = [-6.5, 0.0, 1.0, 2.8, 0.0, -2.0, -4.0, 0.0]
     real, parameter :: P_i(8)= [1.01325e5, 2.26320318222212e4, 5.47487352827083e3, 8.68014769086723e2, &
                 1.10905588989225e2, 5.90005242789244e1, 1.82099249050177e1, 1.03770045489203]
+
+    ! OTHER STUFF
+    
 contains
     
     !!! COORDINATE TRANSFORM !!!
@@ -308,8 +310,7 @@ contains
 
     end function rankine_to_kelvin
 
-
-end module helper_m
+end module goates_m
 
 
 !program test_gravity
