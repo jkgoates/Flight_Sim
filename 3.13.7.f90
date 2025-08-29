@@ -20,17 +20,17 @@ program main
     call cpu_time(end_time)
     print *, 'SI time total [sec]:          ', end_time - start_time
 
-    !write(io_unit,*) 'English atmospheric test'
-    !call cpu_time(start_time)
-    !do i=0,100000,100
-        !do j=1,10000
-            !call std_atm_English(real(i),Z,T,P,rho,a)
-            !g = gravity_English(real(i))
-        !end do
-        !write(io_unit,'(7ES25.11)') real(i),Z,T,P,rho,a,g
-    !end do
-    !call cpu_time(end_time)
-    !print *, 'English time total [sec]:     ', end_time - start_time
+    write(io_unit,*) 'English atmospheric test'
+    call cpu_time(start_time)
+    do i=0,100000,100
+        do j=1,10000
+            call std_atm_English(real(i),Z,T,P,rho,a)
+            g = gravity_English(real(i))
+        end do
+        write(io_unit,'(7ES25.11)') real(i),Z,T,P,rho,a,g
+    end do
+    call cpu_time(end_time)
+    print *, 'English time total [sec]:     ', end_time - start_time
 
     close(io_unit)
 end program main

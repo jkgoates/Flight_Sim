@@ -10,7 +10,10 @@ module helper_m
     real,parameter :: r_ez = 6356766.0 ! US standard atmosphere earth radius in meters
     real,parameter :: R_gas = 287.0528
     real,parameter :: gamma = 1.4
-    
+
+    ! CONVERSION FACTORS
+    real,parameter :: Pa_to_lbf_ft2 = 1/47.880258
+    real,parameter :: kg_m3_to_slug_ft3 = 1/515.379   
 contains
     
     !!! COORDINATE TRANSFORM !!!
@@ -195,7 +198,7 @@ contains
         T_i = [288.150, 216.650, 216.650, 228.650, 270.650, 270.650, 252.650, 180.650]
         Tp_i = [-6.5, 0.0, 1.0, 2.8, 0.0, -2.0, -4.0, 0.0]
         P_i = [1.01325e5, 2.26320318222212e4, 5.47487352827083e3, 8.68014769086723e2, &
-                1.10905588989225e2, 5.90005242789244e1, 1.82099249050177e1, 1.03770445489203]
+                1.10905588989225e2, 5.90005242789244e1, 1.82099249050177e1, 1.03770045489203]
 
         ! Calculate geopotential altitude
         Z = r_ez*h/(r_ez + h)
@@ -222,11 +225,31 @@ contains
                 continue
             end if
 
-
         end do
 
-
     end subroutine std_atm_SI
+
+
+    subroutine std_atm_English(h, Z, T, P, rho, a)
+
+        implicit none
+        
+        real, intent(in) :: h
+        real, intent(inout) :: Z, T, P, rho, a
+
+        real :: h_m
+        
+        h_m = feet_to_meters(h)
+
+        call std_atm_SI(h_m, Z, T, P, rho, a)
+
+        Z = meters_to_feet(Z)
+        T = kelvin_to_rankine(T)
+        P = P*Pa_to_lbf_ft2
+        rho = rho*kg_m3_to_slug_ft3
+        a = meters_to_feet(a)
+
+    end subroutine std_atm_English
 
 
     !!! UNIT CONVERSIONS !!!
@@ -254,6 +277,26 @@ contains
 
     end function meters_to_feet
 
+    function kelvin_to_rankine(T) result(T_R)
+
+        implicit none
+        
+        real, intent(in) :: T
+        real :: T_R
+
+        T_R = 1.8*T
+
+    end function kelvin_to_rankine
+
+    function rankine_to_kelvin(T) result(T_K)
+        implicit none
+        
+        real, intent(in) :: T
+        real :: T_K
+    
+        T_K = T/1.8
+
+    end function rankine_to_kelvin
 
 
 end module helper_m
