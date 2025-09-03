@@ -12,8 +12,8 @@ module goates_m
     real,parameter :: gamma = 1.4
 
     ! CONVERSION FACTORS
-    real,parameter :: Pa_to_lbf_ft2 = 1/47.880258
-    real,parameter :: kg_m3_to_slug_ft3 = 1/515.379   
+    real,parameter :: Pa_to_lbf_ft2 = 1.0/47.880258
+    real,parameter :: kg_m3_to_slug_ft3 = 1.0/515.379   
 
     ! ATMOSPHERE TABLES
     real, parameter :: Z_i(8)= [0., 11000., 20000., 32000., 47000., 52000., 61000., 79000.]
@@ -257,7 +257,7 @@ contains
 
         Z = meters_to_feet(Z)
         T = kelvin_to_rankine(T)
-        P = P*Pa_to_lbf_ft2
+        P = P*1.0/47.880258
         rho = rho*kg_m3_to_slug_ft3
         a = meters_to_feet(a)
 
