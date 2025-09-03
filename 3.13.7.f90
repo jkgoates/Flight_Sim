@@ -1,5 +1,5 @@
 program main
-    use helper_m
+    use hunsaker_m
     implicit none
     integer :: i,j
     real :: Z,T,P,rho,a,g
@@ -10,7 +10,7 @@ program main
 
     write(io_unit,*) 'SI atmospheric test'
     call cpu_time(start_time)
-    do i=0,100000,100
+    do i=0,90000,100
         do j = 0,10000
             call std_atm_SI(real(i),Z,T,P,rho,a)
             g = gravity_SI(real(i))
@@ -22,7 +22,7 @@ program main
 
     write(io_unit,*) 'English atmospheric test'
     call cpu_time(start_time)
-    do i=0,100000,100
+    do i=0,200000,200
         do j=1,10000
             call std_atm_English(real(i),Z,T,P,rho,a)
             g = gravity_English(real(i))
