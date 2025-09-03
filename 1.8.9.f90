@@ -1,5 +1,5 @@
 program main
-    use helper_m
+    use goates_m
     implicit none
     integer :: i, j, k, m, n
     real :: q1(4), q2(4), q3(4)

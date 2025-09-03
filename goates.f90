@@ -147,13 +147,13 @@ contains
         real, intent(in) :: q1(4)
         real :: e1(3)
 
-        if (q1(1)*q1(3) - q1(2)*q1(4) == 0.5) then
+        if (abs(q1(1)*q1(3) - q1(2)*q1(4) - 0.5) < 1e-12) then
             
             e1(1) = 2*asin(q1(2)/cos(PI4))
             e1(2) = PI2
             e1(3) = 0.0
 
-        else if (q1(1)*q1(3) - q1(2)*q1(4) == -0.5) then
+        else if (abs(q1(1)*q1(3) - q1(2)*q1(4) + 0.5) < 1e-12) then
 
             e1(1) = 2*asin(q1(2)/cos(PI4))
             e1(2) = -PI2
