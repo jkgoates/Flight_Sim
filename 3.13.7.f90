@@ -1,5 +1,5 @@
 program main
-    use hunsaker_m
+    use goates_m
     implicit none
     integer :: i,j
     real :: Z,T,P,rho,a,g
