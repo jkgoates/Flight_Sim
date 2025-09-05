@@ -199,6 +199,7 @@ contains
 
         real, intent(in) :: h
         real, intent(inout) :: Z, T, P, rho, a
+        real :: h_p
 
         integer :: i
 
@@ -212,8 +213,14 @@ contains
         !P_i = [1.01325e5, 2.26320318222212e4, 5.47487352827083e3, 8.68014769086723e2, &
                 !1.10905588989225e2, 5.90005242789244e1, 1.82099249050177e1, 1.03770045489203]
 
+        if (h < 0.0) then
+            h_p = 0.0
+        else
+            h_p = h
+        end if
+
         ! Calculate geopotential altitude
-        Z = r_ez*h/(r_ez + h)
+        Z = r_ez*h_p/(r_ez + h_p)
 
         ! Calculate pressure
         do i = 1, 8
@@ -263,6 +270,30 @@ contains
 
     end subroutine std_atm_English
 
+    function sutherland_visc_SI(T) result(mu)
+
+        implicit none
+        
+        real, intent(in) :: T
+        real :: mu
+
+        mu = 1.716e-05*((273.15+110.4)/(T + 110.4))*(T/273.15)**(3./2.)
+
+    end function sutherland_visc_SI
+
+    function sutherland_visc_English(T) result(mu)
+
+        implicit none
+        
+        real, intent(in) :: T
+        real :: mu, T_K
+
+        T_K = rankine_to_kelvin(T)
+
+        mu = sutherland_visc_SI(T_K)*1.0/47.880258
+
+    end function sutherland_visc_English
+
 
     !!! UNIT CONVERSIONS !!!
 
@@ -306,9 +337,37 @@ contains
         real, intent(in) :: T
         real :: T_K
     
-        T_K = T/1.8
+        T_K = T*1.0/1.8
 
     end function rankine_to_kelvin
+
+    function y_English_to_SI(y_eng) result(y_SI)
+
+        implicit none
+
+        real, intent(in) :: y_eng(13)
+        real :: y_SI(13)
+
+        y_SI(1:3) = y_eng(1:3)*0.3048
+        y_SI(4:6) = y_eng(4:6)
+        y_SI(7:9) = y_eng(7:9)*0.3048
+        y_SI(10:13) = y_eng(10:13)
+
+    end function y_English_to_SI
+
+    function y_SI_to_English(y_SI) result(y_eng)
+
+        implicit none
+
+        real, intent(in) :: y_SI(13)
+        real :: y_eng(13)
+
+        y_eng(1:3) = y_SI(1:3)*1.0/0.3048
+        y_eng(4:6) = y_SI(4:6)
+        y_eng(7:9) = y_SI(7:9)*1.0/0.3048
+        y_eng(10:13) = y_SI(10:13)
+
+    end function y_SI_to_English
 
 end module goates_m
 

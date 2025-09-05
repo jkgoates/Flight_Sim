@@ -1,6 +1,7 @@
 module simulation_m
 
     use goates_m
+    use jsonx_m
 
     implicit none
     
@@ -192,14 +193,35 @@ program main
     use simulation_m
     implicit none
 
+
+    character(len=100) :: input_file
+    type(json_value), pointer :: j_main
+    real :: dt, V, H, theta
+
+
     real :: y(13)
     real :: M, I(3,3)
-    y = 0.0
 
-    y(1) = 50.0
-    y(9) = -200.0
-    y(10) = 1.0
+    ! Get input file from command line
+    call get_command_argument(1, input_file)
+
+    ! Load JSON file
+    call jsonx_load(input_file, j_main)
+
+    call jsonx_get(j_main, "simulation.time_step[s]", dt, default_value=0.01)
+    call jsonx_get(j_main, "initial.airspeed[ft/s]", V)
+    call jsonx_get(j_main, "initial.altitude[ft]", H)
+    call jsonx_get(j_main, "initial.elevation_angle[deg]", theta)
+
+    theta = theta*PI/180.
+
+    y = 0.0
+    y(1) = V
     
-    call simulation_main(0.0, 10.0, 0.01, y)
+    y(9) = -H
+
+    y(10:13) = euler_to_quat([0.0, theta, 0.0])
+
+    call simulation_main(0.0, 10.0, dt, y)
 
 end program main
