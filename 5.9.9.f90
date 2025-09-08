@@ -93,38 +93,58 @@ contains
         real, intent(in) :: t, y(13)
         real, intent(out) :: F(3), M(3)
 
-        real :: Z, Temp, P, rho, a, mu
-        real :: radius, Re, CD, V_c, u_c(3)
+        real :: Z, Temp, P, rho, a
+        real :: C_L, C_D, C_S, C_ell, C_m, C_n
+        real :: C_Lalpha, C_D0, C_D2, C_malpha, C_mqbar, C_ell0, C_ellpbar
+        real :: alpha, beta, pbar, qbar, rbar, V, S_w, b, c
+        real :: S_alpha, C_alpha, S_beta, C_beta
 
-        ! Sphere properties
-        radius = 0.13084/2.0 ! feet
+        ! Get atmosphere
+        call std_atm_English(-y(9), Z, temp, P, rho, a)
+        
+        !! ARROW CONSTANTS
+        C_Lalpha = 4.929
+        C_D0 = 5.096
+        C_D2 = 48.138
+        C_malpha = -2.605
+        C_mqbar = -9.06
+        C_ellpbar = -5.378
+        ! Straight Fletchings
+        C_ell0 = 0.0
 
-        ! Get air density
-        call std_atm_English(-y(9), Z, Temp, P, rho, a)
+        S_w = 0.000218 ![ft^2]
+        b = 2.3 ![ft]
+        c = 2.3 ![ft]
 
-        M = 0.0
+        V = norm2(1:3)
 
-        ! Calculate drag force
-        mu = sutherland_visc_English(Temp)
+        pbar = (0.5/V)*y(4)*b
+        qbar = (0.5/V)*y(5)*c
+        rbar = (0.5/V)*y(6)*b
 
-        Re = 2.0*rho*norm2(y(1:3))*radius/mu
+        alpha = atan2(y(3),y(1))
+        beta = asin(y(2),V)
 
-        if (Re < 0.01) then
-            CD = 2405.0
-        else if (Re >= 0.01 .and. Re <= 450000.) then
-            CD = 24.0/Re + 6.0/(1.0+sqrt(Re)) + 0.4
-        else if (Re > 450000. .and. Re <= 560000) then
-            CD = 1.0e29*Re**(-5.211)
-        else if (Re > 560000. .and. Re <= 14000000.) then
-            CD = -2.0e-23*Re**3 - 1.e-16*Re**2 + 9.0e-9*Re + 0.069
-        else
-            CD = 0.12
-        end if
+        C_L = C_Lalpha*alpha
+        C_S = C_Lalpha*beta
+        C_D = C_D0 + C_D2*C_L**2 + C_D2*C_S**2
+        C_ell = C_ell0 + C_ellpbar*pbar
+        C_m = C_malpha*alpha + C_mqbar*qbar
+        C_n = -C_malpha*beta + C_mqbar*rbar
 
-        V_c = norm2(y(1:3))
-        u_c = y(1:3)/V_c
+        S_alpha = sin(alpha)
+        C_alpha = cos(alpha)
+        S_beta = sin(beta)
+        C_beta = cos(beta)
 
-        F = -0.5 * rho * V_c**2 * PI * radius**2 * CD * u_c
+        F(1) = 0.5*rho*V**2 * S_w * (C_L*S_alpha - C_S*C_alpha*S_beta - C_D*C_alpha*C_beta)
+        F(2) = 0.5*rho*V**2 * S_w * (C_S*C_beta - C_D*S_beta)
+        F(3) = 0.5*rho*V**2 * S_w * (-C_L*C_alpha - C_S*S_alpha*S_beta - C_D*S_alpha*C_beta)
+
+        M(1) = 0.5*rho*V**2 * S_w * (b*(C_ell*C_alpha*C_beta - C_n*S_alpha) - c*C_m*C_alpha*S_beta)
+        M(2) = 0.5*rho*V**2 * S_w * (b*C_ell*S_beta + c*C_m*C_beta)
+        M(3) = 0.5*rho*V**2 * S_w * (b*(C_ell*S_alpha*C_beta + C_n*C_alpha) - c*C_m*S_alpha*S_beta)
+
         
     end subroutine psuedo_aerodynamics
 
