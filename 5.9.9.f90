@@ -36,7 +36,7 @@ contains
         real, intent(in) :: t, y(13)
         real :: dy_dt(13)
 
-        real :: mass, I(3,3), F(3), M(3), g, I_inv(3,3)
+        real :: mass, I(3,3), F(3), M(3), g, I_inv(3,3), dummy(3)
 
         g = gravity_English(-y(9))
 
@@ -70,8 +70,10 @@ contains
                             + I(1,3)*(I(2,1)*I(3,2) - I(2,2)*I(3,1)))
 
         ! Eq. 5.4.6
-        ! TO BE IMPLEMENTED LATER
-
+        dummy(1) = M(1) + (I(2,2) - I(3,3))*y(5)*y(6) + I(2,3)*(y(5)**2 - y(6)**2) + I(1,3)*y(4)*y(5) - I(1,2)*y(4)*y(6)
+        dummy(2) = M(2) + (I(3,3) - I(1,1))*y(4)*y(6) + I(1,3)*(y(6)**2 - y(4)**2) + I(1,2)*y(5)*y(6) - I(2,3)*y(4)*y(5)
+        dummy(3) = M(3) + (I(1,1) - I(2,2))*y(4)*y(5) + I(1,2)*(y(4)**2 - y(5)**2) + I(2,3)*y(4)*y(6) - I(1,3)*y(5)*y(6)
+        dy_dt(4:6) = matmul(I_inv, dummy)
 
         ! Eq. 5.4.7
         dy_dt(7:9) = quat_dependent_to_base(y(1:3), y(10:13))
@@ -82,6 +84,8 @@ contains
         dy_dt(12) = 0.5*(  y(13)*y(4) + y(10)*y(5) - y(11)*y(6))
         dy_dt(13) = 0.5*(- y(12)*y(4) + y(11)*y(5) + y(10)*y(6))
         
+        write(*,*) "dy_dt: ", dy_dt
+        write(*,*) "----------------------"
 
 
     end function differential_equations
@@ -98,6 +102,8 @@ contains
         real :: C_Lalpha, C_D0, C_D2, C_malpha, C_mqbar, C_ell0, C_ellpbar
         real :: alpha, beta, pbar, qbar, rbar, V, S_w, b, c
         real :: S_alpha, C_alpha, S_beta, C_beta
+
+        print*, "State vector incoming: ", y
 
         ! Get atmosphere
         call std_atm_English(-y(9), Z, temp, P, rho, a)
@@ -116,36 +122,38 @@ contains
         b = 2.3 ![ft]
         c = 2.3 ![ft]
 
-        V = norm2(1:3)
+        V = sqrt(y(1)**2 + y(2)**2 + y(3)**2)
 
         pbar = (0.5/V)*y(4)*b
         qbar = (0.5/V)*y(5)*c
         rbar = (0.5/V)*y(6)*b
+        write(*,*) "rho: ", rho
 
         alpha = atan2(y(3),y(1))
-        beta = asin(y(2),V)
+        beta = 0.0
 
         C_L = C_Lalpha*alpha
         C_S = C_Lalpha*beta
-        C_D = C_D0 + C_D2*C_L**2 + C_D2*C_S**2
+        C_D = C_D0 + C_D2 * C_L**2
         C_ell = C_ell0 + C_ellpbar*pbar
         C_m = C_malpha*alpha + C_mqbar*qbar
         C_n = -C_malpha*beta + C_mqbar*rbar
 
         S_alpha = sin(alpha)
         C_alpha = cos(alpha)
-        S_beta = sin(beta)
-        C_beta = cos(beta)
 
-        F(1) = 0.5*rho*V**2 * S_w * (C_L*S_alpha - C_S*C_alpha*S_beta - C_D*C_alpha*C_beta)
-        F(2) = 0.5*rho*V**2 * S_w * (C_S*C_beta - C_D*S_beta)
-        F(3) = 0.5*rho*V**2 * S_w * (-C_L*C_alpha - C_S*S_alpha*S_beta - C_D*S_alpha*C_beta)
 
-        M(1) = 0.5*rho*V**2 * S_w * (b*(C_ell*C_alpha*C_beta - C_n*S_alpha) - c*C_m*C_alpha*S_beta)
-        M(2) = 0.5*rho*V**2 * S_w * (b*C_ell*S_beta + c*C_m*C_beta)
-        M(3) = 0.5*rho*V**2 * S_w * (b*(C_ell*S_alpha*C_beta + C_n*C_alpha) - c*C_m*S_alpha*S_beta)
+        F(1) = 0.5*rho*V**2 * S_w * (C_L*S_alpha - C_D*C_alpha)
+        F(2) = 0.0
+        F(3) = 0.5*rho*V**2 * S_w * (-C_L*C_alpha - C_D*S_alpha)
 
-        
+        M(1) = 0.5*rho*V**2 * S_w * (b*(C_ell*C_alpha))
+        M(2) = 0.5*rho*V**2 * S_w * (b*C_ell*S_beta + c*C_m)
+        M(3) = 0.5*rho*V**2 * S_w * (b*(C_n*C_alpha))
+
+        write(*,*) "F: ", F
+        write(*,*) "M: ", M
+
     end subroutine psuedo_aerodynamics
 
 
@@ -160,36 +168,29 @@ contains
         real :: r1, r2
         integer :: j
 
-        r2 = 0.13084/2.0
-        r1 = r2 - 0.00131
-
-        M = 0.006 ! lbf
+        M = 0.0697 ! lbf at sea level
         M = M*0.3048/g_ssl ! slugs
 
         I = 0.0
-        forall(j = 1:3) I(j,j) = 1.0
-
-        I = I*M*(2*(r2**5 - r1**5))/(5*(r2**3 - r1**3))
-
-        !M = M*1.0*14.5939029
-
-        !I = I*1.0*14.5939029
-        !I = I*0.3048**2
+        I(1,1) = 0.0000194 ! slugs-ft^2
+        I(2,2) = 0.00097   ! slugs-ft^2
+        I(3,3) = 0.00097   ! slugs-ft^2
 
     end subroutine mass_inertia
 
-    subroutine simulation_main(t_0, t_f, dt, y_0)
+    subroutine simulation_main(dt, y_0)
 
         implicit none
 
-        real, intent(in) :: t_0, t_f, dt, y_0(13)
+        real, intent(in) :: dt, y_0(13)
 
         real :: t, y(13)
 
-        t = t_0
+        t = 0.0
         y = y_0
 
-        do while (t <= t_f)
+        ! Run until the arrow reaches the ground
+        do while (y(9) < 0.0)
 
             write(*,*) "time: ", t, " s"
             write(*,*) y
@@ -220,7 +221,6 @@ program main
 
 
     real :: y(13)
-    real :: M, I(3,3)
 
     ! Get input file from command line
     call get_command_argument(1, input_file)
@@ -242,6 +242,6 @@ program main
 
     y(10:13) = euler_to_quat([0.0, theta, 0.0])
 
-    call simulation_main(0.0, 10.0, dt, y)
+    call simulation_main(dt, y)
 
 end program main
