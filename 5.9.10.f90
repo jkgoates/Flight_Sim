@@ -18,7 +18,7 @@ contains
 
         real :: k1(13), k2(13), k3(13), k4(13)
 
-        call quat_norm(y(10:13))
+        !call quat_norm(y(10:13))
 
         k1 = differential_equations(t_0, y_0)
         k2 = differential_equations(t_0 + 0.5*dt, y_0 + k1*0.5*dt)
@@ -70,9 +70,9 @@ contains
                             + I(1,3)*(I(2,1)*I(3,2) - I(2,2)*I(3,1)))
 
         ! Eq. 5.4.6
-        dummy(1) = M(1) 
-        dummy(2) = M(2) 
-        dummy(3) = M(3)
+        dummy(1) = M(1) + (I(2,2) - I(3,3))*y(5)*y(6) + I(2,3)*(y(5)**2 - y(6)**2) + I(1,3)*y(4)*y(5) - I(1,2)*y(4)*y(6)
+        dummy(2) = M(2) + (I(3,3) - I(1,1))*y(4)*y(6) + I(1,3)*(y(6)**2 - y(4)**2) + I(1,2)*y(5)*y(6) - I(2,3)*y(4)*y(5)
+        dummy(3) = M(3) + (I(1,1) - I(2,2))*y(4)*y(5) + I(1,2)*(y(4)**2 - y(5)**2) + I(2,3)*y(4)*y(6) - I(1,3)*y(5)*y(6)
         dy_dt(4:6) = matmul(I_inv, dummy)
 
         ! Eq. 5.4.7
@@ -84,8 +84,8 @@ contains
         dy_dt(12) = 0.5*(  y(13)*y(4) + y(10)*y(5) - y(11)*y(6))
         dy_dt(13) = 0.5*(- y(12)*y(4) + y(11)*y(5) + y(10)*y(6))
         
-        !write(*,*) "dy_dt: ", dy_dt
-        !write(*,*) "----------------------"
+        write(*,*) "dy_dt: ", dy_dt
+        write(*,*) "----------------------"
 
 
     end function differential_equations
@@ -103,7 +103,7 @@ contains
         real :: alpha, beta, pbar, qbar, rbar, V, S_w, b, c
         real :: S_alpha, C_alpha, S_beta, C_beta
 
-        !print*, "State vector incoming: ", y
+        print*, "State vector incoming: ", y
 
         ! Get atmosphere
         call std_atm_English(-y(9), Z, temp, P, rho, a)
@@ -115,8 +115,8 @@ contains
         C_malpha = -2.605
         C_mqbar = -9.06
         C_ellpbar = -5.378
-        ! Straight Fletchings
-        C_ell0 = 0.0
+        ! Angled Fletchings
+        C_ell0 = 3.223
 
         S_w = 0.000218 ![ft^2]
         b = 2.3 ![ft]
@@ -129,7 +129,7 @@ contains
         rbar = (0.5/V)*y(6)*b
 
         alpha = atan(y(3),y(1))
-        beta = 0.0
+        beta = asin(y(2)/V)
 
         C_L = C_Lalpha*alpha
         C_S = C_Lalpha*beta
@@ -140,18 +140,20 @@ contains
 
         S_alpha = sin(alpha)
         C_alpha = cos(alpha)
+        S_beta = sin(beta)
+        C_beta = cos(beta)
 
 
         F(1) = 0.5*rho*V**2 * S_w * (-C_D) ! AHHHH
-        F(2) = 0.0
+        F(2) = 0.5*rho*V**2 * S_w * (C_S)
         F(3) = 0.5*rho*V**2 * S_w * (-C_L)
 
-        M(1) = 0.5*rho*V**2 * S_w * (b*(C_ell*C_alpha))
-        M(2) = 0.5*rho*V**2 * S_w * (b*C_ell*S_beta + c*C_m)
-        M(3) = 0.5*rho*V**2 * S_w * (b*(C_n*C_alpha))
+        M(1) = 0.5*rho*V**2 * S_w * (b*(C_ell))
+        M(2) = 0.5*rho*V**2 * S_w * (c*C_m)
+        M(3) = 0.5*rho*V**2 * S_w * (b*(C_n))
 
-        !write(*,*) "F: ", F
-        !write(*,*) "M: ", M
+        write(*,*) "F: ", F
+        write(*,*) "M: ", M
 
     end subroutine psuedo_aerodynamics
 
@@ -189,7 +191,7 @@ contains
         t = 0.0
         y = y_0
 
-        open(newunit=io_unit, file='5.9.9_output.csv', status='replace', action='write')
+        open(newunit=io_unit, file='5.9.10_output.csv', status='replace', action='write')
         write(io_unit,*) 'time[s], u[ft/s], v[ft/s], w[ft/s], p[rad/s], q[rad/s], r[rad/s], xf[ft], yf[ft], zf[ft], e0, ex, ey, ez'
         write(io_unit,*) t,',',y(1),',',y(2),',',y(3),',',y(4),',',y(5),',' &
                             ,y(6),',',y(7),',',y(8),',',y(9),',',y(10),',',y(11),',',y(12),',',y(13)
@@ -197,14 +199,14 @@ contains
         ! Run until the arrow reaches the ground
         do while (y(9) < 0.0)
 
-            !write(*,*) "time: ", t, " s"
-            !write(*,*) y
-            !write(*,*) "----------------------"
+            write(*,*) "time: ", t, " s"
+            write(*,*) y
+            write(*,*) "----------------------"
 
             y = runge_kutta(t, y, dt)
             t = t + dt
-            !write(*,*) "----------------------"
-            !write(*,*) "----------------------"
+            write(*,*) "----------------------"
+            write(*,*) "----------------------"
 
             call quat_norm(y(10:13))
 
