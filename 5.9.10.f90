@@ -103,6 +103,7 @@ contains
         real :: alpha, beta, pbar, qbar, rbar, V, S_w, b, c
         real :: S_alpha, C_alpha, S_beta, C_beta
 
+        print*, "Time: ", t
         print*, "State vector incoming: ", y
 
         ! Get atmosphere
@@ -128,8 +129,9 @@ contains
         qbar = (0.5/V)*y(5)*c
         rbar = (0.5/V)*y(6)*b
 
-        alpha = atan(y(3),y(1))
-        beta = asin(y(2)/V)
+        alpha = atan2(y(3),y(1))
+        !beta = asin(y(2)/V)
+        beta = atan2(y(2),y(1))
 
         C_L = C_Lalpha*alpha
         C_S = C_Lalpha*beta
@@ -143,14 +145,23 @@ contains
         S_beta = sin(beta)
         C_beta = cos(beta)
 
-
+        ! THE WRONG WAY
         F(1) = 0.5*rho*V**2 * S_w * (-C_D) ! AHHHH
         F(2) = 0.5*rho*V**2 * S_w * (C_S)
         F(3) = 0.5*rho*V**2 * S_w * (-C_L)
 
-        M(1) = 0.5*rho*V**2 * S_w * (b*(C_ell))
-        M(2) = 0.5*rho*V**2 * S_w * (c*C_m)
-        M(3) = 0.5*rho*V**2 * S_w * (b*(C_n))
+        !M(1) = 0.5*rho*V**2 * S_w * (b*(C_ell))
+        !M(2) = 0.5*rho*V**2 * S_w * (c*C_m)
+        !M(3) = 0.5*rho*V**2 * S_w * (b*(C_n))
+
+        ! THE RIGHT WAY
+        !F(1) = 0.5*rho*V**2 * S_w * (C_L*S_alpha - C_S*C_alpha*S_beta -C_D*C_alpha*C_beta) ! AHHHH
+        !F(2) = 0.5*rho*V**2 * S_w * (C_S*C_beta + C_D*S_beta)
+        !F(3) = 0.5*rho*V**2 * S_w * (-C_L*C_alpha - C_S*S_alpha*S_beta - C_D*S_alpha*C_beta)
+
+        M(1) = 0.5*rho*V**2 * S_w * (b*(C_ell*C_alpha*C_beta - C_n*S_alpha) - c*C_m*C_alpha*S_beta)
+        M(2) = 0.5*rho*V**2 * S_w * (b*C_ell*S_beta + c*C_m*C_beta)
+        M(3) = 0.5*rho*V**2 * S_w * (b*(C_ell*S_alpha*C_beta + C_n*C_alpha) - c*C_m*S_alpha*S_beta)
 
         write(*,*) "F: ", F
         write(*,*) "M: ", M

@@ -146,9 +146,9 @@ contains
         F(2) = 0.0
         F(3) = 0.5*rho*V**2 * S_w * (-C_L)
 
-        M(1) = 0.5*rho*V**2 * S_w * (b*(C_ell*C_alpha))
-        M(2) = 0.5*rho*V**2 * S_w * (b*C_ell*S_beta + c*C_m)
-        M(3) = 0.5*rho*V**2 * S_w * (b*(C_n*C_alpha))
+        M(1) = 0.0
+        M(2) = 0.5*rho*V**2 * S_w * (c*C_m)
+        M(3) = 0.0
 
         !write(*,*) "F: ", F
         !write(*,*) "M: ", M
