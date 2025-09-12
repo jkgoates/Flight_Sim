@@ -75,9 +75,16 @@ contains
 
         real :: t(4)
 
+        !t(1) = q1(1)
+        !t(2) = -q1(2)
+        !t(3) = -q1(3)
+        !t(4) = -q1(4)
+
+        !vec2 = quat_base_to_dependent(vec1, t)
+
         t(1) =  vec1(1)*q1(2) + vec1(2)*q1(3) + vec1(3)*q1(4)
         t(2) =  vec1(1)*q1(1) - vec1(2)*q1(4) + vec1(3)*q1(3)
-        t(3) = -vec1(1)*q1(4) + vec1(2)*q1(1) - vec1(3)*q1(2)
+        t(3) =  vec1(1)*q1(4) + vec1(2)*q1(1) - vec1(3)*q1(2)
         t(4) = -vec1(1)*q1(3) + vec1(2)*q1(2) + vec1(3)*q1(1)
 
         vec2(1) = q1(1)*t(2) + q1(2)*t(1) + q1(3)*t(4) - q1(4)*t(3)

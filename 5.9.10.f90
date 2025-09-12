@@ -18,7 +18,6 @@ contains
 
         real :: k1(13), k2(13), k3(13), k4(13)
 
-        !call quat_norm(y(10:13))
 
         k1 = differential_equations(t_0, y_0)
         k2 = differential_equations(t_0 + 0.5*dt, y_0 + k1*0.5*dt)
@@ -77,6 +76,8 @@ contains
 
         ! Eq. 5.4.7
         dy_dt(7:9) = quat_dependent_to_base(y(1:3), y(10:13))
+        write(*,*) "TEST: ", (2*(y(11)*y(12) + y(13)*y(10))*y(1) &
+                    + (y(12)**2 + y(10)**2 - y(11)**2 - y(13)**2)*y(2) + 2*(y(12)*y(13) - y(11)*y(10))*y(3))
 
         ! Eq. 5.4.8
         dy_dt(10) = 0.5*(- y(11)*y(4) - y(12)*y(5) - y(13)*y(6))
@@ -130,16 +131,18 @@ contains
         rbar = (0.5/V)*y(6)*b
 
         alpha = atan2(y(3),y(1))
-        !beta = asin(y(2)/V)
-        beta = atan2(y(2),y(1))
+        beta = asin(y(2)/V)
+        !beta = atan2(y(2),y(1))
 
         C_L = C_Lalpha*alpha
         C_S = C_Lalpha*beta
-        C_D = C_D0 + C_D2 * C_L**2
+        C_D = C_D0 + C_D2 * C_L**2 + C_D2 * C_S**2
         C_ell = C_ell0 + C_ellpbar*pbar
         C_m = C_malpha*alpha + C_mqbar*qbar
-        C_n = -C_malpha*beta + C_mqbar*rbar
+        C_n = -C_malpha*beta + 0.25*C_mqbar*rbar !!! THIS IS SOOO WRONG !!!
 
+        alpha = 0.0
+        beta = 0.0
         S_alpha = sin(alpha)
         C_alpha = cos(alpha)
         S_beta = sin(beta)
@@ -147,21 +150,22 @@ contains
 
         ! THE WRONG WAY
         F(1) = 0.5*rho*V**2 * S_w * (-C_D) ! AHHHH
-        F(2) = 0.5*rho*V**2 * S_w * (C_S)
+        F(2) = 0.5*rho*V**2 * S_w * (-C_S)
         F(3) = 0.5*rho*V**2 * S_w * (-C_L)
 
-        !M(1) = 0.5*rho*V**2 * S_w * (b*(C_ell))
-        !M(2) = 0.5*rho*V**2 * S_w * (c*C_m)
-        !M(3) = 0.5*rho*V**2 * S_w * (b*(C_n))
+        M(1) = 0.5*rho*V**2 * S_w * (b*(C_ell))
+        M(2) = 0.5*rho*V**2 * S_w * (c*C_m)
+        M(3) = 0.5*rho*V**2 * S_w * (b*(C_n))
+
 
         ! THE RIGHT WAY
         !F(1) = 0.5*rho*V**2 * S_w * (C_L*S_alpha - C_S*C_alpha*S_beta -C_D*C_alpha*C_beta) ! AHHHH
         !F(2) = 0.5*rho*V**2 * S_w * (C_S*C_beta + C_D*S_beta)
         !F(3) = 0.5*rho*V**2 * S_w * (-C_L*C_alpha - C_S*S_alpha*S_beta - C_D*S_alpha*C_beta)
 
-        M(1) = 0.5*rho*V**2 * S_w * (b*(C_ell*C_alpha*C_beta - C_n*S_alpha) - c*C_m*C_alpha*S_beta)
-        M(2) = 0.5*rho*V**2 * S_w * (b*C_ell*S_beta + c*C_m*C_beta)
-        M(3) = 0.5*rho*V**2 * S_w * (b*(C_ell*S_alpha*C_beta + C_n*C_alpha) - c*C_m*S_alpha*S_beta)
+        !M(1) = 0.5*rho*V**2 * S_w * (b*(C_ell*C_alpha*C_beta - C_n*S_alpha) - c*C_m*C_alpha*S_beta)
+        !M(2) = 0.5*rho*V**2 * S_w * (b*C_ell*S_beta + c*C_m*C_beta)
+        !M(3) = 0.5*rho*V**2 * S_w * (b*(C_ell*S_alpha*C_beta + C_n*C_alpha) - c*C_m*S_alpha*S_beta)
 
         write(*,*) "F: ", F
         write(*,*) "M: ", M
@@ -206,6 +210,8 @@ contains
         write(io_unit,*) 'time[s], u[ft/s], v[ft/s], w[ft/s], p[rad/s], q[rad/s], r[rad/s], xf[ft], yf[ft], zf[ft], e0, ex, ey, ez'
         write(io_unit,*) t,',',y(1),',',y(2),',',y(3),',',y(4),',',y(5),',' &
                             ,y(6),',',y(7),',',y(8),',',y(9),',',y(10),',',y(11),',',y(12),',',y(13)
+
+        call quat_norm(y(10:13))
 
         ! Run until the arrow reaches the ground
         do while (y(9) < 0.0)
