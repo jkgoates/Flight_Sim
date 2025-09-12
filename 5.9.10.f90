@@ -140,7 +140,7 @@ contains
         C_m = C_malpha*alpha + C_mqbar*qbar
         C_n = -C_malpha*beta + C_mqbar*rbar
 
-        beta = asin(y(2)/V)
+        !beta = asin(y(2)/V)
         S_alpha = sin(alpha)
         C_alpha = cos(alpha)
         S_beta = sin(beta)
