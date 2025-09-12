@@ -139,8 +139,7 @@ contains
         C_D = C_D0 + C_D2 * C_L**2 + C_D2 * C_S**2
         C_ell = C_ell0 + C_ellpbar*pbar
         C_m = C_malpha*alpha + C_mqbar*qbar
-        C_n = -C_malpha*beta + 0.25*C_mqbar*rbar !!! THIS IS SOOO WRONG !!!
-
+        C_n = -C_malpha*beta + 0.25*C_mqbar*rbar
         alpha = 0.0
         beta = 0.0
         S_alpha = sin(alpha)
@@ -148,8 +147,8 @@ contains
         S_beta = sin(beta)
         C_beta = cos(beta)
 
-        ! THE WRONG WAY
-        F(1) = 0.5*rho*V**2 * S_w * (-C_D) ! AHHHH
+        ! WIND COORDINATES
+        F(1) = 0.5*rho*V**2 * S_w * (-C_D)
         F(2) = 0.5*rho*V**2 * S_w * (-C_S)
         F(3) = 0.5*rho*V**2 * S_w * (-C_L)
 
@@ -158,8 +157,8 @@ contains
         M(3) = 0.5*rho*V**2 * S_w * (b*(C_n))
 
 
-        ! THE RIGHT WAY
-        !F(1) = 0.5*rho*V**2 * S_w * (C_L*S_alpha - C_S*C_alpha*S_beta -C_D*C_alpha*C_beta) ! AHHHH
+        ! BODY COORDINATES
+        !F(1) = 0.5*rho*V**2 * S_w * (C_L*S_alpha - C_S*C_alpha*S_beta -C_D*C_alpha*C_beta)
         !F(2) = 0.5*rho*V**2 * S_w * (C_S*C_beta + C_D*S_beta)
         !F(3) = 0.5*rho*V**2 * S_w * (-C_L*C_alpha - C_S*S_alpha*S_beta - C_D*S_alpha*C_beta)
 
