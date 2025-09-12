@@ -84,8 +84,8 @@ contains
         dy_dt(12) = 0.5*(  y(13)*y(4) + y(10)*y(5) - y(11)*y(6))
         dy_dt(13) = 0.5*(- y(12)*y(4) + y(11)*y(5) + y(10)*y(6))
         
-        !write(*,*) "dy_dt: ", dy_dt
-        !write(*,*) "----------------------"
+        write(*,*) "dy_dt: ", dy_dt
+        write(*,*) "----------------------"
 
 
     end function differential_equations
@@ -128,8 +128,8 @@ contains
         qbar = (0.5/V)*y(5)*c
         rbar = (0.5/V)*y(6)*b
 
-        alpha = atan(y(3),y(1))
-        beta = 0.0
+        alpha = atan2(y(3),y(1))
+        beta = atan2(y(2),y(1))
 
         C_L = C_Lalpha*alpha
         C_S = C_Lalpha*beta
@@ -138,20 +138,22 @@ contains
         C_m = C_malpha*alpha + C_mqbar*qbar
         C_n = -C_malpha*beta + C_mqbar*rbar
 
+        beta = asin(y(2)/V)
         S_alpha = sin(alpha)
         C_alpha = cos(alpha)
+        S_beta = sin(beta)
+        C_beta = cos(beta)
 
+        F(1) = 0.5*rho*V**2 * S_w * (C_L*S_alpha - C_S*C_alpha*S_beta -C_D*C_alpha*C_beta)
+        F(2) = 0.5*rho*V**2 * S_w * (C_S*C_beta + C_D*S_beta)
+        F(3) = 0.5*rho*V**2 * S_w * (-C_L*C_alpha - C_S*S_alpha*S_beta - C_D*S_alpha*C_beta)
 
-        F(1) = 0.5*rho*V**2 * S_w * (-C_D) ! AHHHH
-        F(2) = 0.0
-        F(3) = 0.5*rho*V**2 * S_w * (-C_L)
-
-        M(1) = 0.0
-        M(2) = 0.5*rho*V**2 * S_w * (c*C_m)
-        M(3) = 0.0
-
-        !write(*,*) "F: ", F
-        !write(*,*) "M: ", M
+        M(1) = 0.5*rho*V**2 * S_w * (b*(C_ell*C_alpha*C_beta - C_n*S_alpha) - c*C_m*C_alpha*S_beta)
+        M(2) = 0.5*rho*V**2 * S_w * (b*C_ell*S_beta + c*C_m*C_beta)
+        M(3) = 0.5*rho*V**2 * S_w * (b*(C_ell*S_alpha*C_beta + C_n*C_alpha) - c*C_m*S_alpha*S_beta)
+        
+        write(*,*) "F: ", F
+        write(*,*) "M: ", M
 
     end subroutine psuedo_aerodynamics
 
@@ -197,14 +199,14 @@ contains
         ! Run until the arrow reaches the ground
         do while (y(9) < 0.0)
 
-            !write(*,*) "time: ", t, " s"
-            !write(*,*) y
-            !write(*,*) "----------------------"
+            write(*,*) "time: ", t, " s"
+            write(*,*) y
+            write(*,*) "----------------------"
 
             y = runge_kutta(t, y, dt)
             t = t + dt
-            !write(*,*) "----------------------"
-            !write(*,*) "----------------------"
+            write(*,*) "----------------------"
+            write(*,*) "----------------------"
 
             call quat_norm(y(10:13))
 

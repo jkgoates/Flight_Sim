@@ -1,11 +1,15 @@
 module simulation_m
 
     use goates_m
+    use aircraft_m
     use jsonx_m
 
     implicit none
     
+    type(aircraft) :: vehicle
     real, parameter :: one_sixth = 1./6.
+
+
 contains
     
     !!! INTEGRATION
@@ -39,8 +43,8 @@ contains
 
         g = gravity_English(-y(9))
 
-        call mass_inertia(t, y, mass, I)
-        call psuedo_aerodynamics(t, y, F, M)
+        call vehicle%aerodynamics(t, y, mass, I)
+        call vehicle%mass_inertia(t, y, F, M)
 
         dy_dt = 0.0
 
@@ -91,118 +95,34 @@ contains
 
     end function differential_equations
 
-    subroutine psuedo_aerodynamics(t, y, F, M)
+
+    subroutine run(j_main)
 
         implicit none
 
-        real, intent(in) :: t, y(13)
-        real, intent(out) :: F(3), M(3)
-
-        real :: Z, Temp, P, rho, a
-        real :: C_L, C_D, C_S, C_ell, C_m, C_n
-        real :: C_Lalpha, C_D0, C_D2, C_malpha, C_mqbar, C_ell0, C_ellpbar
-        real :: alpha, beta, pbar, qbar, rbar, V, S_w, b, c
-        real :: S_alpha, C_alpha, S_beta, C_beta
-
-        print*, "Time: ", t
-        print*, "State vector incoming: ", y
-
-        ! Get atmosphere
-        call std_atm_English(-y(9), Z, temp, P, rho, a)
-        
-        !! ARROW CONSTANTS
-        C_Lalpha = 4.929
-        C_D0 = 5.096
-        C_D2 = 48.138
-        C_malpha = -2.605
-        C_mqbar = -9.06
-        C_ellpbar = -5.378
-        ! Angled Fletchings
-        C_ell0 = 3.223
-
-        S_w = 0.000218 ![ft^2]
-        b = 2.3 ![ft]
-        c = 2.3 ![ft]
-
-        V = sqrt(y(1)**2 + y(2)**2 + y(3)**2)
-
-        pbar = (0.5/V)*y(4)*b
-        qbar = (0.5/V)*y(5)*c
-        rbar = (0.5/V)*y(6)*b
-
-        alpha = atan2(y(3),y(1))
-        beta = atan2(y(2),y(1))
-
-        C_L = C_Lalpha*alpha
-        C_S = C_Lalpha*beta
-        C_D = C_D0 + C_D2 * C_L**2 + C_D2 * C_S**2
-        C_ell = C_ell0 + C_ellpbar*pbar
-        C_m = C_malpha*alpha + C_mqbar*qbar
-        C_n = -C_malpha*beta + C_mqbar*rbar
-
-        beta = asin(y(2)/V)
-        S_alpha = sin(alpha)
-        C_alpha = cos(alpha)
-        S_beta = sin(beta)
-        C_beta = cos(beta)
-
-        ! WIND COORDINATES
-        !F(1) = 0.5*rho*V**2 * S_w * (-C_D)
-        !F(2) = 0.5*rho*V**2 * S_w * (-C_S)
-        !F(3) = 0.5*rho*V**2 * S_w * (-C_L)
-
-        !M(1) = 0.5*rho*V**2 * S_w * (b*(C_ell))
-        !M(2) = 0.5*rho*V**2 * S_w * (c*C_m)
-        !M(3) = 0.5*rho*V**2 * S_w * (b*(C_n))
-
-
-        ! BODY COORDINATES
-        F(1) = 0.5*rho*V**2 * S_w * (C_L*S_alpha - C_S*C_alpha*S_beta -C_D*C_alpha*C_beta)
-        F(2) = 0.5*rho*V**2 * S_w * (C_S*C_beta + C_D*S_beta)
-        F(3) = 0.5*rho*V**2 * S_w * (-C_L*C_alpha - C_S*S_alpha*S_beta - C_D*S_alpha*C_beta)
-
-        M(1) = 0.5*rho*V**2 * S_w * (b*(C_ell*C_alpha*C_beta - C_n*S_alpha) - c*C_m*C_alpha*S_beta)
-        M(2) = 0.5*rho*V**2 * S_w * (b*C_ell*S_beta + c*C_m*C_beta)
-        M(3) = 0.5*rho*V**2 * S_w * (b*(C_ell*S_alpha*C_beta + C_n*C_alpha) - c*C_m*S_alpha*S_beta)
-
-        write(*,*) "F: ", F
-        write(*,*) "M: ", M
-
-    end subroutine psuedo_aerodynamics
-
-
-    subroutine mass_inertia(t, y, M, I)
-
-        implicit none
-
-        real, intent(in) :: t, y(13)
-        real, intent(out) :: M
-        real, intent(out) :: I(3,3)
-
-        real :: r1, r2
-        integer :: j
-
-        M = 0.0697 ! lbf at sea level
-        M = M*0.3048/g_ssl ! slugs
-
-        I = 0.0
-        I(1,1) = 0.0000194 ! slugs-ft^2
-        I(2,2) = 0.00097   ! slugs-ft^2
-        I(3,3) = 0.00097   ! slugs-ft^2
-
-    end subroutine mass_inertia
-
-    subroutine simulation_main(dt, y_0)
-
-        implicit none
-
-        real, intent(in) :: dt, y_0(13)
+        type(json_value), pointer :: j_main
 
         real :: t, y(13)
         integer :: io_unit
 
+        call jsonx_get(j_main, "simulation.time_step[s]", dt, default_value=0.01)
+        call jsonx_get(j_main, "initial.airspeed[ft/s]", V)
+        call jsonx_get(j_main, "initial.altitude[ft]", H)
+        call jsonx_get(j_main, "initial.elevation_angle[deg]", theta)
+
+        theta = theta*PI/180.
+
+        y = 0.0
         t = 0.0
-        y = y_0
+
+
+        y(1) = V
+    
+        y(9) = -H
+
+        y(10:13) = euler_to_quat([0.0, theta, 0.0])
+
+
 
         open(newunit=io_unit, file='5.9.10_output.csv', status='replace', action='write')
         write(io_unit,*) 'time[s], u[ft/s], v[ft/s], w[ft/s], p[rad/s], q[rad/s], r[rad/s], xf[ft], yf[ft], zf[ft], e0, ex, ey, ez'
@@ -233,42 +153,6 @@ contains
         close(io_unit)
 
 
-    end subroutine simulation_main
+    end subroutine run 
 
 end module simulation_m 
-
-program main
-    use simulation_m
-    implicit none
-
-
-    character(len=100) :: input_file
-    type(json_value), pointer :: j_main
-    real :: dt, V, H, theta
-
-
-    real :: y(13)
-
-    ! Get input file from command line
-    call get_command_argument(1, input_file)
-
-    ! Load JSON file
-    call jsonx_load(input_file, j_main)
-
-    call jsonx_get(j_main, "simulation.time_step[s]", dt, default_value=0.01)
-    call jsonx_get(j_main, "initial.airspeed[ft/s]", V)
-    call jsonx_get(j_main, "initial.altitude[ft]", H)
-    call jsonx_get(j_main, "initial.elevation_angle[deg]", theta)
-
-    theta = theta*PI/180.
-
-    y = 0.0
-    y(1) = V
-    
-    y(9) = -H
-
-    y(10:13) = euler_to_quat([0.0, theta, 0.0])
-
-    call simulation_main(dt, y)
-
-end program main

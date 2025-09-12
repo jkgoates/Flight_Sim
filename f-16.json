@@ -1,0 +1,25 @@
+{
+    "simulation": {
+        "timestep[s]": 0.01,
+        "total_time[s]" : 5.0
+    },
+    "vehicle": {
+
+    },
+    "initial": {
+        "airspeed[ft/s]": 330.0,
+        "altitude[ft]": 1000.0,
+        "elevation_angle[deg]": 7.858650044026,
+        "bank_angle[deg]": 0.0,
+        "heading_angle[deg]": 0.0,
+        "alpha[deg]": 7.858650044026,
+        "beta[deg]": 0.0,
+        "p[deg/s]": 0.0,
+        "q[deg/s]": 0.0,
+        "r[deg/s]": 0.0,
+        "aileron[deg]": 0.0,
+        "elevator[deg]": -4.940749182476,
+        "rudder[deg]": 0.0,
+        "throttle": 0.06794815882517
+    }
+}
