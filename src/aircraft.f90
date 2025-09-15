@@ -8,6 +8,8 @@ module aircraft_m
     type :: aircraft
         
         real :: M, Ixx, Iyy, Izz, Ixy, Iyz, Ixz ! Mass and Inertia matrix
+        real :: hx, hy, hz ! Gyroscopic components
+        real :: T0, a ! Thrust parameters
         real :: S_w, b, c ! Reference area, span, chord
         real :: CL_0, CL_alpha, CL_alphahat, CL_qbar, CL_de ! Lift coefficients
         real :: CS_beta, CS_pbar, CS_alpha_pbar, CS_rbar, CS_da, CS_dr ! Side force coefficients
@@ -21,6 +23,8 @@ module aircraft_m
 
         procedure :: mass_inertia   => aircraft_mass_inertia
         procedure :: aerodynamics   => aircraft_aerodynamics
+        procedure :: gyroscopic     => aircraft_gyroscopic
+        procedure :: thrust         => aircraft_thrust
         procedure :: init           => aircraft_init
         
     
@@ -33,11 +37,12 @@ contains
         class(aircraft), intent(inout) :: this
         type(json_value), pointer, intent(in) :: settings
 
-        type(json_value), pointer :: reference, coefficients
+        type(json_value), pointer :: reference, coefficients, aerodynamics
 
         ! Parse JSON settings
-        call jsonx_get(settings, "aerodynamics.reference", reference)
-        call jsonx_get(settings, "aerodynamics.coefficients", coefficients)
+        call jsonx_get(settings, "aerodynamics", aerodynamics)
+        call jsonx_get(aerodynamics, "coefficients", coefficients)
+        call jsonx_get(aerodynamics, "reference", reference)
 
         ! Mass properties
         call jsonx_get(settings, "mass.weight[lbf]", this%M)
@@ -47,6 +52,13 @@ contains
         call jsonx_get(settings, "mass.Ixy[slug-ft^2]", this%Ixy, 0.0)
         call jsonx_get(settings, "mass.Iyz[slug-ft^2]", this%Iyz, 0.0)
         call jsonx_get(settings, "mass.Ixz[slug-ft^2]", this%Ixz, 0.0)
+        call jsonx_get(settings, "mass.hx[slug-ft^2/s]", this%hx, 0.0)
+        call jsonx_get(settings, "mass.hy[slug-ft^2/s]", this%hy, 0.0)
+        call jsonx_get(settings, "mass.hz[slug-ft^2/s]", this%hz, 0.0)
+
+        ! Thrust Properties
+        call jsonx_get(settings, "thrust.T0[lbf]", this%T0, 0.0)
+        call jsonx_get(settings, "thrust.a", this%a, 0.0)
 
         ! Reference properties
         call jsonx_get(reference, "area[ft^2]", this%S_w)
@@ -111,8 +123,7 @@ contains
     
         class(aircraft), intent(in) :: this
         real, intent(in) :: t, y(13)
-        real, intent(out) :: mass
-        real, intent(out) :: I(3,3)
+        real, intent(out) :: mass, I(3,3)
         
         mass = this%M
         I(1,1) = this%Ixx
@@ -125,28 +136,64 @@ contains
         I(3,2) = -this%Iyz
         I(1,3) = -this%Ixz
         I(3,1) = -this%Ixz
-
-        
         
     end subroutine aircraft_mass_inertia
 
-    subroutine aircraft_aerodynamics(this, t, y, F, M)
+    subroutine aircraft_gyroscopic(this, t, y, h)
     
         class(aircraft), intent(in) :: this
         real, intent(in) :: t, y(13)
-        real, intent(out) :: F(3), M(3)
+        real, intent(out) :: h(3)
         
+        h(1) = this%hx
+        h(2) = this%hy
+        h(3) = this%hz
+        
+    end subroutine aircraft_gyroscopic
+
+    function aircraft_thrust(this, t, y, throttle) result(thrust)
+   
+        implicit none
+        
+        class(aircraft), intent(in) :: this
+        real, intent(in) :: t, y(13), throttle
+        
+        real :: thrust
+
+        real :: Z, Temp, P, rho, a
+        real :: Z_0, Temp_0, P_0, rho_0, a_0
+
+        ! Get atmosphere
+        call std_atm_English(-y(9), Z, temp, P, rho, a)
+        call std_atm_English(0.0, Z_0, temp_0, P_0, rho_0, a_0)
+
+        thrust = throttle*this%T0*(rho/rho_0)**this%a
+        print*, "Thrust: ", thrust
+
+    end function aircraft_thrust
+
+    subroutine aircraft_aerodynamics(this, t, y, F, M, controls)
+
+        implicit none
+    
+        class(aircraft), intent(in) :: this
+        real, intent(in) :: t, y(13)
+        real, intent(out) :: F(3), M(3), controls(4)
+
         real :: Z, Temp, P, rho, a
         real :: C_L1, C_L, C_D, C_S, C_ell, C_m, C_n
-        real :: de, da, dr
+        real :: de, da, dr, throttle
 
         real :: alpha, beta, pbar, qbar, rbar, V, alphahat
         real :: S_alpha, C_alpha, S_beta, C_beta
 
         !print*, "State vector incoming: ", y
-        de = 0.0
-        da = 0.0
-        dr = 0.0
+        da = controls(1)
+        de = controls(2)
+        dr = controls(3)
+        throttle = controls(4)
+        
+        write(*,*) "Controls: ", da, de, dr, throttle
 
         ! Get atmosphere
         call std_atm_English(-y(9), Z, temp, P, rho, a)
@@ -178,18 +225,23 @@ contains
         C_n = this%Cn_beta*beta + this%Cn_pbar*pbar + this%Cn_alpha_pbar*alpha*pbar + this%Cn_rbar*rbar &
                 + this%Cn_da*da + this%Cn_alpha_da*alpha*da + this%Cn_dr*dr
 
+        write(*,*) "Coefficients: ", C_L, C_D, C_S, C_ell, C_m, C_n
+
         S_alpha = sin(alpha)
         C_alpha = cos(alpha)
         S_beta = sin(beta)
         C_beta = cos(beta)
 
         F(1) = 0.5*rho*V**2 * this%S_w * (C_L*S_alpha - C_S*C_alpha*S_beta -C_D*C_alpha*C_beta)
-        F(2) = 0.5*rho*V**2 * this%S_w * (C_S*C_beta + C_D*S_beta)
+        F(2) = 0.5*rho*V**2 * this%S_w * (C_S*C_beta - C_D*S_beta)
         F(3) = 0.5*rho*V**2 * this%S_w * (-C_L*C_alpha - C_S*S_alpha*S_beta - C_D*S_alpha*C_beta)
 
         M(1) = 0.5*rho*V**2 * this%S_w * (this%b*(C_ell))
         M(2) = 0.5*rho*V**2 * this%S_w * (this%c*C_m)
         M(3) = 0.5*rho*V**2 * this%S_w * (this%b*(C_n))
+
+        ! Add thrust in the body x-direction
+        F(1) = F(1) + this%thrust(t, y, throttle)
         
         write(*,*) "F: ", F
         write(*,*) "M: ", M

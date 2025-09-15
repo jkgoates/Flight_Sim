@@ -16,7 +16,7 @@ program main
     ! Load JSON file
     call jsonx_load(input_file, j_main)
 
-    call run()
+    call run(j_main)
 
     
-end program mai
+end program main

@@ -7,6 +7,8 @@ module simulation_m
     implicit none
     
     type(aircraft) :: vehicle
+    ! Private control parameters
+    real, private :: da, de, dr, throttle
     real, parameter :: one_sixth = 1./6.
 
 
@@ -39,12 +41,16 @@ contains
         real, intent(in) :: t, y(13)
         real :: dy_dt(13)
 
-        real :: mass, I(3,3), F(3), M(3), g, I_inv(3,3), dummy(3)
+        real :: mass, I(3,3), F(3), M(3), g, I_inv(3,3), dummy(3), h(3)
+        real :: controls(4)
 
         g = gravity_English(-y(9))
 
-        call vehicle%aerodynamics(t, y, mass, I)
-        call vehicle%mass_inertia(t, y, F, M)
+        controls = get_controls(t, y)
+
+        call vehicle%mass_inertia(t, y, mass, I)
+        call vehicle%aerodynamics(t, y, F, M, controls)
+        call vehicle%gyroscopic(t, y, h)
 
         dy_dt = 0.0
 
@@ -73,10 +79,14 @@ contains
                             + I(1,3)*(I(2,1)*I(3,2) - I(2,2)*I(3,1)))
 
         ! Eq. 5.4.6
-        dummy(1) = M(1) + (I(2,2) - I(3,3))*y(5)*y(6) + I(2,3)*(y(5)**2 - y(6)**2) + I(1,3)*y(4)*y(5) - I(1,2)*y(4)*y(6)
-        dummy(2) = M(2) + (I(3,3) - I(1,1))*y(4)*y(6) + I(1,3)*(y(6)**2 - y(4)**2) + I(1,2)*y(5)*y(6) - I(2,3)*y(4)*y(5)
-        dummy(3) = M(3) + (I(1,1) - I(2,2))*y(4)*y(5) + I(1,2)*(y(4)**2 - y(5)**2) + I(2,3)*y(4)*y(6) - I(1,3)*y(5)*y(6)
+        dummy(1) = M(1) + (-h(3)*y(5) + h(2)*y(6)) 
+        dummy(2) = M(2) + ( h(3)*y(4) - h(1)*y(6)) 
+        dummy(3) = M(3) + (-h(2)*y(4) + h(1)*y(5)) 
+        dummy(1) = dummy(1) + (I(2,2) - I(3,3))*y(5)*y(6) + I(2,3)*(y(5)**2 - y(6)**2) + I(1,3)*y(4)*y(5) - I(1,2)*y(4)*y(6)
+        dummy(2) = dummy(2) + (I(3,3) - I(1,1))*y(4)*y(6) + I(1,3)*(y(6)**2 - y(4)**2) + I(1,2)*y(5)*y(6) - I(2,3)*y(4)*y(5)
+        dummy(3) = dummy(3) + (I(1,1) - I(2,2))*y(4)*y(5) + I(1,2)*(y(4)**2 - y(5)**2) + I(2,3)*y(4)*y(6) - I(1,3)*y(5)*y(6)
         dy_dt(4:6) = matmul(I_inv, dummy)
+
 
         ! Eq. 5.4.7
         dy_dt(7:9) = quat_dependent_to_base(y(1:3), y(10:13))
@@ -95,6 +105,19 @@ contains
 
     end function differential_equations
 
+    function get_controls(t, y) result(controls)
+
+        implicit none
+        real, intent(in) :: t, y(13)
+        real :: controls(4)
+
+        ! Get control inputs
+        controls(1) = da
+        controls(2) = de
+        controls(3) = dr
+        controls(4) = throttle
+
+    end function get_controls
 
     subroutine run(j_main)
 
@@ -106,10 +129,11 @@ contains
 
         real :: t, y(13)
         integer :: io_unit
-        real :: dt, V, H, theta, phi, psi
-        real :: alpha, beta, p, q, r, da, de, dr, throttle
+        real :: dt, tf, V, H, theta, phi, psi
+        real :: alpha, beta, p, q, r
 
-        call jsonx_get(j_main, "simulation.time_step[s]", dt, default_value=0.01)
+        call jsonx_get(j_main, "simulation.timestep[s]", dt, default_value=0.01)
+        call jsonx_get(j_main, "simulation.total_time[s]", tf)
         call jsonx_get(j_main, "initial.airspeed[ft/s]", V)
         call jsonx_get(j_main, "initial.altitude[ft]", H)
         call jsonx_get(j_main, "initial.elevation_angle[deg]", theta, default_value=0.0)
@@ -126,7 +150,7 @@ contains
         call jsonx_get(j_main, "initial.throttle", throttle, default_value=0.0)
 
         ! Initialize the aircraft
-        call jsonx_get(j_main, "aircraft", j_aircraft)
+        call jsonx_get(j_main, "vehicle", j_aircraft)
         call vehicle%init(j_aircraft)
 
         ! Set initial conditions
@@ -134,6 +158,7 @@ contains
         phi = phi*PI/180.
         theta = theta*PI/180.
         psi = psi*PI/180.
+        
         alpha = alpha*PI/180.
         beta = beta*PI/180.
 
@@ -162,8 +187,8 @@ contains
 
         call quat_norm(y(10:13))
 
-        ! Run until the arrow reaches the ground
-        do while (y(9) < 0.0)
+        ! Run simulation
+        do while (t < tf)
 
             write(*,*) "time: ", t, " s"
             write(*,*) y
