@@ -19,9 +19,9 @@ module aircraft_m
     
     contains
 
-        procedure :: mass_inertia => aircraft_mass_inertia
-        procedure :: aerodynamics => aircraft_aerodynamics
-        procedure :: init => aircraft_init
+        procedure :: mass_inertia   => aircraft_mass_inertia
+        procedure :: aerodynamics   => aircraft_aerodynamics
+        procedure :: init           => aircraft_init
         
     
     end type aircraft
@@ -103,7 +103,7 @@ contains
         call jsonx_get(coefficients, "Cn.alpha_aileron", this%Cn_alpha_da)
         call jsonx_get(coefficients, "Cn.rudder", this%Cn_dr)
 
-        
+
 
     end subroutine aircraft_init
 
@@ -114,9 +114,19 @@ contains
         real, intent(out) :: mass
         real, intent(out) :: I(3,3)
         
-        mass = 0.0
+        mass = this%M
+        I(1,1) = this%Ixx
+        I(2,2) = this%Iyy
+        I(3,3) = this%Izz
+
+        I(1,2) = -this%Ixy
+        I(2,1) = -this%Ixy
+        I(2,3) = -this%Iyz
+        I(3,2) = -this%Iyz
+        I(1,3) = -this%Ixz
+        I(3,1) = -this%Ixz
+
         
-        I = 0.0
         
     end subroutine aircraft_mass_inertia
 

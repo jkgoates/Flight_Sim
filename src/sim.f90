@@ -100,31 +100,62 @@ contains
 
         implicit none
 
-        type(json_value), pointer :: j_main
+        type(json_value), pointer, intent(in) :: j_main
+
+        type(json_value), pointer :: j_aircraft
 
         real :: t, y(13)
         integer :: io_unit
+        real :: dt, V, H, theta, phi, psi
+        real :: alpha, beta, p, q, r, da, de, dr, throttle
 
         call jsonx_get(j_main, "simulation.time_step[s]", dt, default_value=0.01)
         call jsonx_get(j_main, "initial.airspeed[ft/s]", V)
         call jsonx_get(j_main, "initial.altitude[ft]", H)
-        call jsonx_get(j_main, "initial.elevation_angle[deg]", theta)
+        call jsonx_get(j_main, "initial.elevation_angle[deg]", theta, default_value=0.0)
+        call jsonx_get(j_main, "initial.bank_angle[deg]", phi, default_value=0.0)
+        call jsonx_get(j_main, "initial.heading_angle[deg]", psi, default_value=0.0)
+        call jsonx_get(j_main, "initial.alpha[deg]", alpha, default_value=0.0)
+        call jsonx_get(j_main, "initial.beta[deg]", beta, default_value=0.0)
+        call jsonx_get(j_main, "initial.p[deg/s]", p, default_value=0.0)
+        call jsonx_get(j_main, "initial.q[deg/s]", q, default_value=0.0)
+        call jsonx_get(j_main, "initial.r[deg/s]", r, default_value =0.0)
+        call jsonx_get(j_main, "initial.aileron[deg]", da, default_value=0.0)
+        call jsonx_get(j_main, "initial.elevator[deg]", de, default_value=0.0)
+        call jsonx_get(j_main, "initial.rudder[deg]", dr, default_value=0.0)
+        call jsonx_get(j_main, "initial.throttle", throttle, default_value=0.0)
 
+        ! Initialize the aircraft
+        call jsonx_get(j_main, "aircraft", j_aircraft)
+        call vehicle%init(j_aircraft)
+
+        ! Set initial conditions
+
+        phi = phi*PI/180.
         theta = theta*PI/180.
+        psi = psi*PI/180.
+        alpha = alpha*PI/180.
+        beta = beta*PI/180.
 
         y = 0.0
         t = 0.0
 
+        y(1) = V*cos(alpha)*cos(beta)
+        y(2) = V*sin(beta)
+        y(3) = V*sin(alpha)*cos(beta)
 
-        y(1) = V
-    
+
+        y(4) = p*PI/180.
+        y(5) = q*PI/180.
+        y(6) = r*PI/180.
+
         y(9) = -H
 
-        y(10:13) = euler_to_quat([0.0, theta, 0.0])
+        y(10:13) = euler_to_quat([phi, theta, psi])
 
 
 
-        open(newunit=io_unit, file='5.9.10_output.csv', status='replace', action='write')
+        open(newunit=io_unit, file='sim_output.csv', status='replace', action='write')
         write(io_unit,*) 'time[s], u[ft/s], v[ft/s], w[ft/s], p[rad/s], q[rad/s], r[rad/s], xf[ft], yf[ft], zf[ft], e0, ex, ey, ez'
         write(io_unit,*) t,',',y(1),',',y(2),',',y(3),',',y(4),',',y(5),',' &
                             ,y(6),',',y(7),',',y(8),',',y(9),',',y(10),',',y(11),',',y(12),',',y(13)
