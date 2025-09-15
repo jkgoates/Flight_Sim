@@ -177,9 +177,9 @@ contains
         F(2) = 0.5*rho*V**2 * this%S_w * (C_S*C_beta + C_D*S_beta)
         F(3) = 0.5*rho*V**2 * this%S_w * (-C_L*C_alpha - C_S*S_alpha*S_beta - C_D*S_alpha*C_beta)
 
-        M(1) = 0.5*rho*V**2 * this%S_w * (this%b*(C_ell*C_alpha*C_beta - C_n*S_alpha) - this%c*C_m*C_alpha*S_beta)
-        M(2) = 0.5*rho*V**2 * this%S_w * (this%b*C_ell*S_beta + this%c*C_m*C_beta)
-        M(3) = 0.5*rho*V**2 * this%S_w * (this%b*(C_ell*S_alpha*C_beta + C_n*C_alpha) - this%c*C_m*S_alpha*S_beta)
+        M(1) = 0.5*rho*V**2 * this%S_w * (this%b*(C_ell))
+        M(2) = 0.5*rho*V**2 * this%S_w * (this%c*C_m)
+        M(3) = 0.5*rho*V**2 * this%S_w * (this%b*(C_n))
         
         write(*,*) "F: ", F
         write(*,*) "M: ", M

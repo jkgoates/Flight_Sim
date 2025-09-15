@@ -132,8 +132,8 @@ contains
         beta = atan2(y(2),y(1))
 
         C_L = C_Lalpha*alpha
-        C_S = C_Lalpha*beta
-        C_D = C_D0 + C_D2 * C_L**2
+        C_S = -C_Lalpha*beta
+        C_D = C_D0 + C_D2 * C_L**2 + C_D2 *C_S**2
         C_ell = C_ell0 + C_ellpbar*pbar
         C_m = C_malpha*alpha + C_mqbar*qbar
         C_n = -C_malpha*beta + C_mqbar*rbar
@@ -145,15 +145,12 @@ contains
         C_beta = cos(beta)
 
         F(1) = 0.5*rho*V**2 * S_w * (C_L*S_alpha - C_S*C_alpha*S_beta -C_D*C_alpha*C_beta)
-        F(2) = 0.5*rho*V**2 * S_w * (C_S*C_beta + C_D*S_beta)
+        F(2) = 0.5*rho*V**2 * S_w * (C_S*C_beta - C_D*S_beta)
         F(3) = 0.5*rho*V**2 * S_w * (-C_L*C_alpha - C_S*S_alpha*S_beta - C_D*S_alpha*C_beta)
 
         M(1) = 0.5*rho*V**2 * S_w * (b*(C_ell))
         M(2) = 0.5*rho*V**2 * S_w * (c*C_m)
         M(3) = 0.5*rho*V**2 * S_w * (b*(C_n))
-        !M(1) = 0.5*rho*V**2 * S_w * (b*(C_ell*C_alpha*C_beta - C_n*S_alpha) - c*C_m*C_alpha*S_beta)
-        !M(2) = 0.5*rho*V**2 * S_w * (b*C_ell*S_beta + c*C_m*C_beta)
-        !M(3) = 0.5*rho*V**2 * S_w * (b*(C_ell*S_alpha*C_beta + C_n*C_alpha) - c*C_m*S_alpha*S_beta)
         
         write(*,*) "F: ", F
         write(*,*) "M: ", M
@@ -250,6 +247,7 @@ program main
     call jsonx_get(j_main, "initial.bank_angle[deg]", phi)
 
     theta = theta*PI/180.
+    phi = phi*PI/180.
 
     y = 0.0
     y(1) = V

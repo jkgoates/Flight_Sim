@@ -5,7 +5,7 @@
     "initial": {
         "airspeed[ft/s]": 210,
         "altitude[ft]": 5.0,
-        "elevation_angle[deg]": 0.0,
-        "bank_angle[deg]": 90.0
+        "elevation_angle[deg]": 5.0,
+        "bank_angle[deg]": 0.0
     }
 }

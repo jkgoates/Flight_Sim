@@ -118,7 +118,9 @@ contains
         C_mqbar = -9.06
         C_ellpbar = -5.378
         ! Angled Fletchings
-        C_ell0 = 3.223
+        !C_ell0 = 3.223
+        ! Straight Fletchings
+        C_ell0 = 0.0
 
         S_w = 0.000218 ![ft^2]
         b = 2.3 ![ft]
@@ -134,36 +136,27 @@ contains
         beta = atan2(y(2),y(1))
 
         C_L = C_Lalpha*alpha
-        C_S = C_Lalpha*beta
+        C_S = -C_Lalpha*beta
         C_D = C_D0 + C_D2 * C_L**2 + C_D2 * C_S**2
         C_ell = C_ell0 + C_ellpbar*pbar
         C_m = C_malpha*alpha + C_mqbar*qbar
         C_n = -C_malpha*beta + C_mqbar*rbar
 
-        !beta = asin(y(2)/V)
+        beta = asin(y(2)/V)
         S_alpha = sin(alpha)
         C_alpha = cos(alpha)
         S_beta = sin(beta)
         C_beta = cos(beta)
 
-        ! WIND COORDINATES
-        !F(1) = 0.5*rho*V**2 * S_w * (-C_D)
-        !F(2) = 0.5*rho*V**2 * S_w * (-C_S)
-        !F(3) = 0.5*rho*V**2 * S_w * (-C_L)
+
+        F(1) = 0.5*rho*V**2 * S_w * (C_L*S_alpha - C_S*C_alpha*S_beta -C_D*C_alpha*C_beta)
+        F(2) = 0.5*rho*V**2 * S_w * (C_S*C_beta - C_D*S_beta)
+        F(3) = 0.5*rho*V**2 * S_w * (-C_L*C_alpha - C_S*S_alpha*S_beta - C_D*S_alpha*C_beta)
 
         M(1) = 0.5*rho*V**2 * S_w * (b*(C_ell))
         M(2) = 0.5*rho*V**2 * S_w * (c*C_m)
         M(3) = 0.5*rho*V**2 * S_w * (b*(C_n))
 
-
-        ! BODY COORDINATES
-        F(1) = 0.5*rho*V**2 * S_w * (C_L*S_alpha - C_S*C_alpha*S_beta -C_D*C_alpha*C_beta)
-        F(2) = 0.5*rho*V**2 * S_w * (C_S*C_beta + C_D*S_beta)
-        F(3) = 0.5*rho*V**2 * S_w * (-C_L*C_alpha - C_S*S_alpha*S_beta - C_D*S_alpha*C_beta)
-
-        !M(1) = 0.5*rho*V**2 * S_w * (b*(C_ell*C_alpha*C_beta - C_n*S_alpha) - c*C_m*C_alpha*S_beta)
-        !M(2) = 0.5*rho*V**2 * S_w * (b*C_ell*S_beta + c*C_m*C_beta)
-        !M(3) = 0.5*rho*V**2 * S_w * (b*(C_ell*S_alpha*C_beta + C_n*C_alpha) - c*C_m*S_alpha*S_beta)
 
         write(*,*) "F: ", F
         write(*,*) "M: ", M
@@ -244,7 +237,7 @@ program main
 
     character(len=100) :: input_file
     type(json_value), pointer :: j_main
-    real :: dt, V, H, theta
+    real :: dt, V, H, theta, phi
 
 
     real :: y(13)
@@ -259,15 +252,17 @@ program main
     call jsonx_get(j_main, "initial.airspeed[ft/s]", V)
     call jsonx_get(j_main, "initial.altitude[ft]", H)
     call jsonx_get(j_main, "initial.elevation_angle[deg]", theta)
+    call jsonx_get(j_main, "initial.bank_angle[deg]", phi)
 
     theta = theta*PI/180.
+    phi = phi*PI/180.
 
     y = 0.0
     y(1) = V
     
     y(9) = -H
 
-    y(10:13) = euler_to_quat([0.0, theta, 0.0])
+    y(10:13) = euler_to_quat([phi, theta, 0.0])
 
     call simulation_main(dt, y)
 
