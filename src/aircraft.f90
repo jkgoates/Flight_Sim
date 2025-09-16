@@ -192,8 +192,6 @@ contains
         de = controls(2)
         dr = controls(3)
         throttle = controls(4)
-        
-        write(*,*) "Controls: ", da, de, dr, throttle
 
         ! Get atmosphere
         call std_atm_English(-y(9), Z, temp, P, rho, a)
@@ -217,7 +215,7 @@ contains
         C_L = C_L1 + this%CL_qbar*qbar + this%CL_alphahat*alphahat + this%CL_de*de
         C_S = this%CS_beta*beta + (this%CS_pbar + this%CS_alpha_pbar*alpha)*pbar &
                 + this%CS_rbar*rbar + this%CS_da*da + this%CS_dr*dr
-        C_D = this%CD_L0 + this%CD_CL1*C_L1 + this%CD_CL1_CL1*C_L1**2 + this%CD_CS_CS*C_S**2 &
+        C_D = this%CD_L0 + this%CD_CL1*C_L1 + this%CD_CL1_CL1*(C_L1**2) + this%CD_CS_CS*C_S**2 &
                 + (this%CD_qbar + this%CD_alpha_qbar*alpha)*qbar + this%CD_de*de + this%CD_alpha_de*alpha*de + this%CD_de_de*de**2
         C_ell = this%Cell_beta*beta + this%Cell_pbar*pbar + this%Cell_alpha_rbar*alpha*rbar + this%Cell_rbar*rbar &
                 + this%Cell_da*da + this%Cell_dr*dr
@@ -225,14 +223,20 @@ contains
         C_n = this%Cn_beta*beta + this%Cn_pbar*pbar + this%Cn_alpha_pbar*alpha*pbar + this%Cn_rbar*rbar &
                 + this%Cn_da*da + this%Cn_alpha_da*alpha*da + this%Cn_dr*dr
 
-        write(*,*) "Coefficients: ", C_L, C_D, C_S, C_ell, C_m, C_n
+        write(*,*) "alpha: ", alpha
+        write(*,*) "de: ", de
+        write(*,*) "coefficients: ", C_L, C_D, C_S, C_ell, C_m, C_n
 
         S_alpha = sin(alpha)
         C_alpha = cos(alpha)
         S_beta = sin(beta)
         C_beta = cos(beta)
 
-        F(1) = 0.5*rho*V**2 * this%S_w * (C_L*S_alpha - C_S*C_alpha*S_beta -C_D*C_alpha*C_beta)
+        write(*,*) "CL*S_alpha", C_L*S_alpha
+        write(*,*) "CD*C_alpha", C_D*C_alpha
+        
+
+        F(1) = 0.5*rho*V**2 * this%S_w * (C_L*S_alpha - C_S*C_alpha*S_beta - C_D*C_alpha*C_beta)
         F(2) = 0.5*rho*V**2 * this%S_w * (C_S*C_beta - C_D*S_beta)
         F(3) = 0.5*rho*V**2 * this%S_w * (-C_L*C_alpha - C_S*S_alpha*S_beta - C_D*S_alpha*C_beta)
 

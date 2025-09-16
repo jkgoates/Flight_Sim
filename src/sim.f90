@@ -112,9 +112,9 @@ contains
         real :: controls(4)
 
         ! Get control inputs
-        controls(1) = da
-        controls(2) = de
-        controls(3) = dr
+        controls(1) = da*PI/180.
+        controls(2) = de*PI/180.
+        controls(3) = dr*PI/180.
         controls(4) = throttle
 
     end function get_controls

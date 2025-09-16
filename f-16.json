@@ -1,7 +1,7 @@
 {
     "simulation": {
         "timestep[s]": 0.01,
-        "total_time[s]" : 0.2
+        "total_time[s]" : 0.02
     },
     "vehicle": {
         "mass": {
