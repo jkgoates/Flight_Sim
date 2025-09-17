@@ -1,6 +1,5 @@
 module simulation_m
 
-    use goates_m
     use aircraft_m
     use jsonx_m
 
@@ -44,6 +43,11 @@ contains
         real :: mass, I(3,3), F(3), M(3), g, I_inv(3,3), dummy(3), h(3)
         real :: controls(4)
 
+        if (verbose) then
+            write(*,*) "t: ", t
+            write(*,*) "y: ", y
+        end if
+
         g = gravity_English(-y(9))
 
         controls = get_controls(t, y)
@@ -57,12 +61,9 @@ contains
         ! Sim of Flight Eq. 5.4.5
         
         dy_dt(1:3) = (1.0/mass)*F
-        !write(*,*) "F: ", F
-        !write(*,*) "dy_dt: ", dy_dt
         dy_dt(1) = dy_dt(1) + g*(2*(y(11)*y(13) - y(12)*y(10))) + (y(6)*y(2) - y(5)*y(3))
         dy_dt(2) = dy_dt(2) + g*(2*(y(12)*y(13) + y(11)*y(10))) + (y(4)*y(3) - y(6)*y(1))
         dy_dt(3) = dy_dt(3) + g*(y(13)**2 + y(10)**2 - y(11)**2 - y(12)**2) + (y(5)*y(1) - y(4)*y(2))
-        !write(*,*) "dy_dt: ", dy_dt
 
         ! Calculate I_inv
         I_inv(1,1) = I(2,2)*I(3,3) - I(2,3)*I(3,2)
@@ -82,16 +83,15 @@ contains
         dummy(1) = M(1) + (-h(3)*y(5) + h(2)*y(6)) 
         dummy(2) = M(2) + ( h(3)*y(4) - h(1)*y(6)) 
         dummy(3) = M(3) + (-h(2)*y(4) + h(1)*y(5)) 
-        dummy(1) = dummy(1) + (I(2,2) - I(3,3))*y(5)*y(6) + I(2,3)*(y(5)**2 - y(6)**2) + I(1,3)*y(4)*y(5) - I(1,2)*y(4)*y(6)
-        dummy(2) = dummy(2) + (I(3,3) - I(1,1))*y(4)*y(6) + I(1,3)*(y(6)**2 - y(4)**2) + I(1,2)*y(5)*y(6) - I(2,3)*y(4)*y(5)
-        dummy(3) = dummy(3) + (I(1,1) - I(2,2))*y(4)*y(5) + I(1,2)*(y(4)**2 - y(5)**2) + I(2,3)*y(4)*y(6) - I(1,3)*y(5)*y(6)
+        dummy(1) = dummy(1) + (I(2,2) - I(3,3))*y(5)*y(6) - I(2,3)*(y(5)**2 - y(6)**2) - I(1,3)*y(4)*y(5) + I(1,2)*y(4)*y(6)
+        dummy(2) = dummy(2) + (I(3,3) - I(1,1))*y(4)*y(6) - I(1,3)*(y(6)**2 - y(4)**2) - I(1,2)*y(5)*y(6) + I(2,3)*y(4)*y(5)
+        dummy(3) = dummy(3) + (I(1,1) - I(2,2))*y(4)*y(5) - I(1,2)*(y(4)**2 - y(5)**2) - I(2,3)*y(4)*y(6) + I(1,3)*y(5)*y(6)
         dy_dt(4:6) = matmul(I_inv, dummy)
 
 
         ! Eq. 5.4.7
         dy_dt(7:9) = quat_dependent_to_base(y(1:3), y(10:13))
-        write(*,*) "TEST: ", (2*(y(11)*y(12) + y(13)*y(10))*y(1) &
-                    + (y(12)**2 + y(10)**2 - y(11)**2 - y(13)**2)*y(2) + 2*(y(12)*y(13) - y(11)*y(10))*y(3))
+
 
         ! Eq. 5.4.8
         dy_dt(10) = 0.5*(- y(11)*y(4) - y(12)*y(5) - y(13)*y(6))
@@ -99,8 +99,10 @@ contains
         dy_dt(12) = 0.5*(  y(13)*y(4) + y(10)*y(5) - y(11)*y(6))
         dy_dt(13) = 0.5*(- y(12)*y(4) + y(11)*y(5) + y(10)*y(6))
         
-        write(*,*) "dy_dt: ", dy_dt
-        write(*,*) "----------------------"
+        if (verbose) then
+            write(*,*) "dy_dt: ", dy_dt
+            write(*,*) "----------------------"
+        end if
 
 
     end function differential_equations
@@ -127,13 +129,17 @@ contains
 
         type(json_value), pointer :: j_aircraft
 
-        real :: t, y(13)
+        real :: t, y(13), y_temp(13)
         integer :: io_unit
         real :: dt, tf, V, H, theta, phi, psi
         real :: alpha, beta, p, q, r
+        logical :: t_R
+        real :: t_p, t_c, start_time, end_time
+
 
         call jsonx_get(j_main, "simulation.timestep[s]", dt, default_value=0.01)
         call jsonx_get(j_main, "simulation.total_time[s]", tf)
+        call jsonx_get(j_main, "simulation.verbose", verbose, default_value=.false.)
         call jsonx_get(j_main, "initial.airspeed[ft/s]", V)
         call jsonx_get(j_main, "initial.altitude[ft]", H)
         call jsonx_get(j_main, "initial.elevation_angle[deg]", theta, default_value=0.0)
@@ -187,17 +193,45 @@ contains
 
         call quat_norm(y(10:13))
 
+        ! Check for real time sim
+        if (dt == 0.0) then
+            t_R = .true.
+        else
+            t_R = .false.
+        end if
+
+        if (t_R) then
+            y_temp = y
+            call cpu_time(t_p)
+            y = runge_kutta(t, y, 0.01)
+            call cpu_time(t_c)
+            dt = t_c - t_p
+            y = y_temp
+            t_p = t_c
+        end if
+
+
+        call cpu_time(start_time)
         ! Run simulation
         do while (t < tf)
 
-            write(*,*) "time: ", t, " s"
-            write(*,*) y
-            write(*,*) "----------------------"
+            if (verbose) then
+                write(*,*) "time: ", t, " s"
+                write(*,*) y
+                write(*,*) "----------------------"
+            end if
 
             y = runge_kutta(t, y, dt)
             t = t + dt
-            write(*,*) "----------------------"
-            write(*,*) "----------------------"
+            if (t_R) then
+                call cpu_time(t_c)
+                dt = t_c - t_p
+                t_p = t_c
+            end if
+            if (verbose) then
+                write(*,*) "----------------------"
+                write(*,*) "----------------------"
+            end if
 
             call quat_norm(y(10:13))
 
@@ -205,9 +239,15 @@ contains
                             ,y(6),',',y(7),',',y(8),',',y(9),',',y(10),',',y(11),',',y(12),',',y(13)
 
         end do
+        call cpu_time(end_time)
 
         close(io_unit)
 
+        write(*,*) "Simulation Finished in ", end_time - start_time, " seconds."
+        
+        if (t_R) then
+            write(*,*) "Real time simulation error: ", tf - (end_time - start_time), " seconds."
+        end if
 
     end subroutine run 
 

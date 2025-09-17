@@ -25,6 +25,7 @@ module goates_m
                 1.10905588989225e2, 5.90005242789244e1, 1.82099249050177e1, 1.03770045489203]
 
     ! OTHER STUFF
+    logical :: verbose
     
 contains
     

@@ -8,8 +8,10 @@ module aircraft_m
     type :: aircraft
         
         real :: M, Ixx, Iyy, Izz, Ixy, Iyz, Ixz ! Mass and Inertia matrix
+        real, dimension(:), allocatable :: CG_shift ! CG shift from reference point (ft)
         real :: hx, hy, hz ! Gyroscopic components
         real :: T0, a ! Thrust parameters
+        real, dimension(:), allocatable :: t_location
         real :: S_w, b, c ! Reference area, span, chord
         real :: CL_0, CL_alpha, CL_alphahat, CL_qbar, CL_de ! Lift coefficients
         real :: CS_beta, CS_pbar, CS_alpha_pbar, CS_rbar, CS_da, CS_dr ! Side force coefficients
@@ -38,11 +40,16 @@ contains
         type(json_value), pointer, intent(in) :: settings
 
         type(json_value), pointer :: reference, coefficients, aerodynamics
+        logical :: found
 
         ! Parse JSON settings
         call jsonx_get(settings, "aerodynamics", aerodynamics)
         call jsonx_get(aerodynamics, "coefficients", coefficients)
         call jsonx_get(aerodynamics, "reference", reference)
+
+        ! CG Shift
+        call json_get(settings, "CG_shift[ft]", this%CG_shift, found)
+        if (.not.found) allocate(this%CG_shift(3), source=0.0)
 
         ! Mass properties
         call jsonx_get(settings, "mass.weight[lbf]", this%M)
@@ -59,6 +66,8 @@ contains
         ! Thrust Properties
         call jsonx_get(settings, "thrust.T0[lbf]", this%T0, 0.0)
         call jsonx_get(settings, "thrust.a", this%a, 0.0)
+        call json_get(settings, "thrust.location[ft]", this%t_location, found)
+        if (.not.found) allocate(this%t_location(3), source=0.0)
 
         ! Reference properties
         call jsonx_get(reference, "area[ft^2]", this%S_w)
@@ -124,8 +133,10 @@ contains
         class(aircraft), intent(in) :: this
         real, intent(in) :: t, y(13)
         real, intent(out) :: mass, I(3,3)
+
+        real :: E(3,3)
         
-        mass = this%M
+        mass = this%M*0.3048/g_ssl ! Convert lbf to slugs
         I(1,1) = this%Ixx
         I(2,2) = this%Iyy
         I(3,3) = this%Izz
@@ -136,6 +147,16 @@ contains
         I(3,2) = -this%Iyz
         I(1,3) = -this%Ixz
         I(3,1) = -this%Ixz
+
+        ! identity matrix
+        E = 0.0
+        E(1,1) = 1.0
+        E(2,2) = 1.0
+        E(3,3) = 1.0
+
+        ! Apply CG shift to inertia matrix
+        I = I + mass * (dot_product(this%CG_shift, this%CG_shift)*E &
+                        - matmul(reshape(this%CG_shift, [3,1]), reshape(this%CG_shift, [1,3])))
         
     end subroutine aircraft_mass_inertia
 
@@ -158,7 +179,7 @@ contains
         class(aircraft), intent(in) :: this
         real, intent(in) :: t, y(13), throttle
         
-        real :: thrust
+        real :: thrust(3)
 
         real :: Z, Temp, P, rho, a
         real :: Z_0, Temp_0, P_0, rho_0, a_0
@@ -167,8 +188,8 @@ contains
         call std_atm_English(-y(9), Z, temp, P, rho, a)
         call std_atm_English(0.0, Z_0, temp_0, P_0, rho_0, a_0)
 
-        thrust = throttle*this%T0*(rho/rho_0)**this%a
-        print*, "Thrust: ", thrust
+        thrust = 0.0
+        thrust(1) = throttle*this%T0*(rho/rho_0)**this%a
 
     end function aircraft_thrust
 
@@ -186,6 +207,7 @@ contains
 
         real :: alpha, beta, pbar, qbar, rbar, V, alphahat
         real :: S_alpha, C_alpha, S_beta, C_beta
+        real :: thrust(3)
 
         !print*, "State vector incoming: ", y
         da = controls(1)
@@ -223,18 +245,10 @@ contains
         C_n = this%Cn_beta*beta + this%Cn_pbar*pbar + this%Cn_alpha_pbar*alpha*pbar + this%Cn_rbar*rbar &
                 + this%Cn_da*da + this%Cn_alpha_da*alpha*da + this%Cn_dr*dr
 
-        write(*,*) "alpha: ", alpha
-        write(*,*) "de: ", de
-        write(*,*) "coefficients: ", C_L, C_D, C_S, C_ell, C_m, C_n
-
         S_alpha = sin(alpha)
         C_alpha = cos(alpha)
         S_beta = sin(beta)
         C_beta = cos(beta)
-
-        write(*,*) "CL*S_alpha", C_L*S_alpha
-        write(*,*) "CD*C_alpha", C_D*C_alpha
-        
 
         F(1) = 0.5*rho*V**2 * this%S_w * (C_L*S_alpha - C_S*C_alpha*S_beta - C_D*C_alpha*C_beta)
         F(2) = 0.5*rho*V**2 * this%S_w * (C_S*C_beta - C_D*S_beta)
@@ -244,11 +258,22 @@ contains
         M(2) = 0.5*rho*V**2 * this%S_w * (this%c*C_m)
         M(3) = 0.5*rho*V**2 * this%S_w * (this%b*(C_n))
 
-        ! Add thrust in the body x-direction
-        F(1) = F(1) + this%thrust(t, y, throttle)
+        ! Apply CG shift to moments
+        M(1) = M(1) - (this%CG_shift(2)*F(3) - this%CG_shift(3)*F(2))
+        M(2) = M(2) - (this%CG_shift(3)*F(1) - this%CG_shift(1)*F(3))
+        M(3) = M(3) - (this%CG_shift(1)*F(2) - this%CG_shift(2)*F(1))
+
+        ! Add thrust influence
+        thrust = this%thrust(t, y, throttle)
+        F = F + thrust
+        M(1) = M(1) + (this%t_location(2)*thrust(3) - this%t_location(3)*thrust(2))
+        M(2) = M(2) + (this%t_location(3)*thrust(1) - this%t_location(1)*thrust(3))
+        M(3) = M(3) + (this%t_location(1)*thrust(2) - this%t_location(2)*thrust(1))
         
-        write(*,*) "F: ", F
-        write(*,*) "M: ", M
+        if (verbose) then
+            write(*,*) "F: ", F
+            write(*,*) "M: ", M
+        end if
         
     end subroutine aircraft_aerodynamics
     
