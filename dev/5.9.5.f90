@@ -96,7 +96,11 @@ contains
         real :: radius, Re, CD, V_c, u_c(3)
 
         ! Sphere properties
-        radius = 0.13084/2.0 ! feet
+        ! TENNIS BALL
+        radius = 0.21667/2.0 ! feet
+
+        ! PING PONG BALL
+        !radius = 0.13084/2.0 ! feet
 
         ! Get air density
         call std_atm_English(-y(9), Z, Temp, P, rho, a)
@@ -139,10 +143,19 @@ contains
         real :: r1, r2
         integer :: j
 
-        r2 = 0.13084/2.0
-        r1 = r2 - 0.00131
+        ! TENNIS BALL
+        r2 = 0.21667/2.0
+        r1 = r2 - 0.00984252
 
-        M = 0.006 ! lbf
+        M = 0.125 ! lbf
+
+        ! PING PONG BALL
+        !r2 = 0.13084/2.0
+        !r1 = r2 - 0.00131
+
+        !M = 0.006 ! lbf
+
+        ! Convert
         M = M*0.3048/g_ssl ! slugs
 
         I = 0.0
@@ -164,23 +177,54 @@ contains
         real, intent(in) :: t_0, t_f, dt, y_0(13)
 
         real :: t, y(13)
+        logical :: check
+        integer :: io_unit
 
         t = t_0
         y = y_0
 
-        do while (t <= t_f)
+        ! TENNIS BALL
+        open(newunit=io_unit, file='tennis_serve.csv', status='replace', action='write')
+        write(io_unit,*) 'time[s], u[ft/s], v[ft/s], w[ft/s], p[rad/s], q[rad/s], r[rad/s], xf[ft], yf[ft], zf[ft], e0, ex, ey, ez'
+        write(io_unit,*) t,',',y(1),',',y(2),',',y(3),',',y(4),',',y(5),',' &
+                            ,y(6),',',y(7),',',y(8),',',y(9),',',y(10),',',y(11),',',y(12),',',y(13)
 
+        check = .false.
+        do while (y(9) < 0.0)
             write(*,*) "time: ", t, " s"
             write(*,*) y
             write(*,*) "----------------------"
-            y = runge_kutta(t, y, dt)
-            t = t + dt
-            write(*,*) "----------------------"
-            write(*,*) "----------------------"
 
-            call quat_norm(y(10:13))
+            y = runge_kutta(t,y,dt)
+            t = t+dt
+            write(io_unit,*) t,',',y(1),',',y(2),',',y(3),',',y(4),',',y(5),',' &
+                            ,y(6),',',y(7),',',y(8),',',y(9),',',y(10),',',y(11),',',y(12),',',y(13)
+
+            if (check) then
+                if (y(7) > 39.0) exit
+            end if
+
+            if (y(9) > -3.0) then
+                if (y(7) < 39.0) check = .true.
+            end if
 
         end do
+        close(io_unit)
+
+        ! PING PONG BALL
+        !do while (t <= t_f)
+
+            !write(*,*) "time: ", t, " s"
+            !write(*,*) y
+            !write(*,*) "----------------------"
+            !y = runge_kutta(t, y, dt)
+            !t = t + dt
+            !write(*,*) "----------------------"
+            !write(*,*) "----------------------"
+
+            !call quat_norm(y(10:13))
+
+        !end do
 
 
 
@@ -193,13 +237,25 @@ program main
     implicit none
 
     real :: y(13)
-    real :: M, I(3,3)
+    real :: M, I(3,3), theta
     y = 0.0
 
-    y(1) = 50.0
-    y(9) = -200.0
-    y(10) = 1.0
+    theta = -7.5*PI/180.0
+
+    ! Tennis Ball
+    ! First serve
+    !y(1) = 178.933
+    ! Second serve
+    y(1) = 140.8
+    y(9) = -9.0
+    y(10:13) = euler_to_quat([0.0, theta, 0.0])
+
+
+    ! Ping Pong Ball
+    !y(1) = 50.0
+    !y(9) = -200.0
+    !y(10) = 1.0
     
-    call simulation_main(0.0, 10.0, 0.01, y)
+    call simulation_main(0.0, 10.0, 0.005, y)
 
 end program main
