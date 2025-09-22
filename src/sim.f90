@@ -2,6 +2,7 @@ module simulation_m
 
     use aircraft_m
     use jsonx_m
+    use linalg_mod
 
     implicit none
     
@@ -122,7 +123,17 @@ contains
     end function get_controls
 
     ! Trim Functions
-    !function calc_R(G)
+    function calc_R(t, y, G) result(R)
+
+        implicit none
+        real, intent(in) :: y(13), t, G(6)
+        real :: R(6)
+
+
+
+
+    end function calc_R
+        
 
     subroutine run(j_main)
 
