@@ -121,6 +121,9 @@ contains
 
     end function get_controls
 
+    ! Trim Functions
+    !function calc_R(G)
+
     subroutine run(j_main)
 
         implicit none

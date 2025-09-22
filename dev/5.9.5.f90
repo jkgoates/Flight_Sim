@@ -240,7 +240,7 @@ program main
     real :: M, I(3,3), theta
     y = 0.0
 
-    theta = -7.5*PI/180.0
+    theta = -5.0*PI/180.0
 
     ! Tennis Ball
     ! First serve
