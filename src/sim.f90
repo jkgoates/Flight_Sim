@@ -129,11 +129,39 @@ contains
         real, intent(in) :: y(13), t, G(6)
         real :: R(6)
 
+        real :: y_temp(13), V, dy_dt(13)
 
+        y_temp = y
 
+        ! Set Controls
+        da = G(3)
+        de = G(4)
+        dr = G(5)
+        throttle = G(6)
+
+        ! Set velocity vector
+        V = norm2(y_temp(1:3))
+        y_temp(1) = V*cos(G(1))*cos(G(2))
+        y_temp(2) = V*sin(G(2))
+        y_temp(3) = V*sin(G(1))*cos(G(2))
+
+        ! Run diff_eq
+        dy_dt = differential_equations(t, y)
+        
+        R = dy_dt(1:6)
 
     end function calc_R
+
+    function newtons_solver(t, y) result(G)
+
+        implicit none
+        real, intent(in) :: y(13), t
+        real :: G(6)
         
+
+
+    end function newtons_solver
+
 
     subroutine run(j_main)
 
