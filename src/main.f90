@@ -12,6 +12,7 @@ program main
 
     ! Load JSON file
     call jsonx_load(input_file, j_main)
+    ! call init(input_file)
 
     call run(j_main)
 

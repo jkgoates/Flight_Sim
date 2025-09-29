@@ -19,6 +19,7 @@ module aircraft_m
         real :: Cell_beta, Cell_pbar, Cell_alpha_rbar, Cell_rbar, Cell_da, Cell_dr ! Rolling moment coefficients
         real :: Cm_0, Cm_alpha, Cm_qbar, Cm_alphahat, Cm_de ! Pitching moment coefficients
         real :: Cn_beta, Cn_pbar, Cn_alpha_pbar, Cn_rbar, Cn_da, Cn_alpha_da, Cn_dr ! Yawing moment coefficients
+        ! real :: rho0
     
     
     contains
@@ -48,8 +49,7 @@ contains
         call jsonx_get(aerodynamics, "reference", reference)
 
         ! CG Shift
-        call json_get(settings, "CG_shift[ft]", this%CG_shift, found)
-        if (.not.found) allocate(this%CG_shift(3), source=0.0)
+        call jsonx_get(settings, "CG_shift[ft]", this%CG_shift, 0.0, 3)
 
         ! Mass properties
         call jsonx_get(settings, "mass.weight[lbf]", this%M)
@@ -66,8 +66,7 @@ contains
         ! Thrust Properties
         call jsonx_get(settings, "thrust.T0[lbf]", this%T0, 0.0)
         call jsonx_get(settings, "thrust.a", this%a, 0.0)
-        call json_get(settings, "thrust.location[ft]", this%t_location, found)
-        if (.not.found) allocate(this%t_location(3), source=0.0)
+        call jsonx_get(settings, "thrust.location[ft]", this%t_location, 0.0, 3)
 
         ! Reference properties
         call jsonx_get(reference, "area[ft^2]", this%S_w)
