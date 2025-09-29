@@ -139,12 +139,6 @@ contains
         dr = G(5)
         throttle = G(6)
 
-        ! Set velocity vector
-        V = norm2(y_temp(1:3))
-        y_temp(1) = V*cos(G(1))*cos(G(2))
-        y_temp(2) = V*sin(G(2))
-        y_temp(3) = V*sin(G(1))*cos(G(2))
-
         ! Run diff_eq
         dy_dt = differential_equations(t, y)
         
@@ -152,15 +146,85 @@ contains
 
     end function calc_R
 
-    function newtons_solver(t, y) result(G)
+    function newtons_solver(t, y, controls) result(G)
 
         implicit none
-        real, intent(in) :: y(13), t
+        real, intent(in) :: y(13), t, controls(4)
         real :: G(6)
+
         
 
 
     end function newtons_solver
+
+    function trim_solver(j_trim, V_mag, H, euler) result(y)
+
+        implicit none
+        
+        type(json_value), pointer, intent(in) :: j_trim
+        real, intent(in) :: V_mag, H, euler(3)
+
+        real :: fd_step, relaxation, tol
+        integer :: i, max_iter
+        character :: trim_type(5)
+        real :: u, v, w, rot_rates
+        real :: alpha, beta, da, de, dr, throttle
+        real :: error, gravity
+
+        call jsonx_get(j_trim, "type", trim_type, default_value="sct")
+        call jsonx_get(j_trim, "solver.finite_differenc_step_size", fd_step, default_value=0.01)
+        call jsonx_get(j_trim, "solver.relaxation_factor", relaxation, default_value=0.9)
+        call jsonx_get(j_trim, "solver.tolerance", tol, default_value=1.e-12)
+        call jsonx_get(j_trim, "solver.max_iterations", max_iter, default_value=100)
+
+        gravity = gravity_English(H)
+
+        ! Initialize
+        alpha = 0.0
+        beta = 0.0
+        u = 0.0
+        v = 0.0
+        w = 0.0
+        rot_rates = 0.0
+        da = 0.0
+        de = 0.0
+        dr = 0.0
+        throttle = 0.0
+
+        do i = 1, max_iter
+
+            ! Calculate velocities
+            u = V_mag*cos(alpha)*cos(beta)
+            v = V_mag*sin(beta)
+            w = V_mag*sin(alpha)*cos(beta)
+
+            ! Calculate rotation rates
+            if (trim_type = "sct") then
+                rot_rates(1) = -sin(euler(2))
+                rot_rates(2) = sin(euler(1))*cos(euler(2))
+                rot_rates(3) = cos(euler(1))*cos(euler(2))
+
+                rot_rates = rot_rates*gravity*sin(euler(1))*cos(euler(2))/(u*cos(euler(2))*cos(euler(1)) + w*sin(euler(2)))
+            end if
+
+            ! Solve for trim state
+            G = newtons_solver(t, [u, v, w, rot_rates(1), rot_rates(2), rot_rates(3), 0.0, 0.0, -H, euler_to_quat(euler)], [da, de, dr, throttle])
+
+            ! Update alpha, beta, and controls
+            alpha = G(1)
+            beta = G(2)
+            da = G(3)
+            de = G(4)
+            dr = G(5)
+            throttle = G(6)
+
+        
+            if (error < tol) exit
+        end do 
+
+
+
+    end function trim_solver
 
 
     subroutine run(j_main)

@@ -118,9 +118,9 @@ contains
         C_mqbar = -9.06
         C_ellpbar = -5.378
         ! Angled Fletchings
-        !C_ell0 = 3.223
+        C_ell0 = 3.223
         ! Straight Fletchings
-        C_ell0 = 0.0
+        !C_ell0 = 0.0
 
         S_w = 0.000218 ![ft^2]
         b = 2.3 ![ft]
