@@ -1,8 +1,8 @@
 {
     "simulation": {
         "timestep[s]": 0.01,
-        "total_time[s]" : 60.0,
-        "verbose": false
+        "total_time[s]" : 5.0,
+        "verbose": true
     },
     "vehicle": {
         "mass": {
@@ -94,6 +94,7 @@
         "q[deg/s]": 0.0,
         "r[deg/s]": 0.0,
         "aileron[deg]": 0.0,
+        "xelevator[deg]": -0.0,
         "elevator[deg]": -4.940749182476,
         "rudder[deg]": 0.0,
         "throttle": 0.06794815882517

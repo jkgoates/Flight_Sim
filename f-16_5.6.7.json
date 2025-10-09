@@ -5,7 +5,6 @@
         "total_time[s]" : 60.0
     },
     "vehicle": {
-        "CG_shift[ft]": [1.0, 0.0, 0.0],
         "mass": {
             "weight[lbf]": 20500.0,
             "Ixx[slug-ft^2]": 9496.0,
@@ -26,7 +25,8 @@
             "reference" : {
                 "area[ft^2]": 300.0,
                 "longitudinal_length[ft]": 11.32,
-                "lateral_length[ft]": 30.0
+                "lateral_length[ft]": 30.0,
+                "relative_location[ft]": [-1.0, 0.0, 0.0]
             },
             "coefficients": {
                 "CL" : {
@@ -95,8 +95,8 @@
         "q[deg/s]": 0.0,
         "r[deg/s]": 0.0,
         "aileron[deg]": 0.0,
-        "elevator[deg]": -9.0,
-        "xelevator[deg]": -9.439727285186,
+        "xelevator[deg]": -9.0,
+        "elevator[deg]": -9.439727285186,
         "rudder[deg]": 0.0,
         "throttle": 0.07405968483138
     }

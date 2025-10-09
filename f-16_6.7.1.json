@@ -19,7 +19,7 @@
             "hz[slug-ft^2/s]": 0.0
         },
         "thrust": {
-            "location[ft]": [0.0, 0.0, 2.0],
+            "xlocation[ft]": [0.0, 0.0, 2.0],
             "T0[lbf]": 29550,
             "a" : 0.84
         },
@@ -27,7 +27,8 @@
             "reference" : {
                 "area[ft^2]": 300.0,
                 "longitudinal_length[ft]": 11.32,
-                "lateral_length[ft]": 30.0
+                "lateral_length[ft]": 30.0,
+                "relative_location[ft]": [-1.0, 0.0, 0.0]
             },
             "coefficients": {
                 "CL" : {
@@ -87,17 +88,17 @@
     "initial": {
         "airspeed[ft/s]": 330.0,
         "altitude[ft]": 1000.0,
-        "elevation_angle[deg]": 8.323880929236,
-        "bank_angle[deg]": 0.0,
-        "heading_angle[deg]": 0.0,
-        "alpha[deg]": 8.323880929236,
-        "beta[deg]": 0.0,
-        "p[deg/s]": 0.0,
-        "q[deg/s]": 0.0,
-        "r[deg/s]": 0.0,
-        "aileron[deg]": 0.0,
-        "elevator[deg]": -8.514444904737,
-        "rudder[deg]": 0.0,
-        "throttle": 0.07241991535911
+
+        "Euler_angles[deg]": [60.0, 7.694005314345, 0.0],
+        "type": "trim",
+        "trim": {
+            "type": "sct",
+            "solver": {
+                "finite_difference_step_size": 0.01,
+                "relaxation_factor": 0.9,
+                "tolerance": 1.0e-12,
+                "max_iterations": 100
+            }
+        }
     }
 }

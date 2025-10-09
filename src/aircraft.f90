@@ -49,7 +49,7 @@ contains
         call jsonx_get(aerodynamics, "reference", reference)
 
         ! CG Shift
-        call jsonx_get(settings, "CG_shift[ft]", this%CG_shift, 0.0, 3)
+        !call jsonx_get(settings, "CG_shift[ft]", this%CG_shift, 0.0, 3)
 
         ! Mass properties
         call jsonx_get(settings, "mass.weight[lbf]", this%M)
@@ -72,6 +72,7 @@ contains
         call jsonx_get(reference, "area[ft^2]", this%S_w)
         call jsonx_get(reference, "longitudinal_length[ft]", this%c)
         call jsonx_get(reference, "lateral_length[ft]", this%b)
+        call jsonx_get(reference, "relative_location[ft]", this%CG_shift, 0.0, 3)
 
         ! Lift coefficients
         call jsonx_get(coefficients, "CL.0", this%CL_0)
@@ -134,8 +135,10 @@ contains
         real, intent(out) :: mass, I(3,3)
 
         real :: E(3,3)
-        
-        mass = this%M*0.3048/g_ssl ! Convert lbf to slugs
+       
+        !mass = this%M*0.3048/g_ssl ! Convert lbf to slugs
+        !mass = this%M/32.1740485564304 ! Convert lbf to slugs
+        mass = this%M/gravity_English(0.0)
         I(1,1) = this%Ixx
         I(2,2) = this%Iyy
         I(3,3) = this%Izz
@@ -154,8 +157,12 @@ contains
         E(3,3) = 1.0
 
         ! Apply CG shift to inertia matrix
-        I = I + mass * (dot_product(this%CG_shift, this%CG_shift)*E &
-                        - matmul(reshape(this%CG_shift, [3,1]), reshape(this%CG_shift, [1,3])))
+        ! THIS EQUATION IS WRONG BUT IS USED TO CHECK BOOK EXAMPLES
+        !I = I + mass * (dot_product(this%CG_shift, this%CG_shift)*E &
+                        !- matmul(reshape(this%CG_shift, [3,1]), reshape(this%CG_shift, [1,3])))
+        ! THIS IS THE CORRECT EQUATION
+        !I = I - mass * (dot_product(this%CG_shift, this%CG_shift)*E &
+                        !- matmul(reshape(this%CG_shift, [3,1]), reshape(this%CG_shift, [1,3])))
         
     end subroutine aircraft_mass_inertia
 
@@ -189,6 +196,7 @@ contains
 
         thrust = 0.0
         thrust(1) = throttle*this%T0*(rho/rho_0)**this%a
+        if (throttle < 0.0) thrust = 0.0
 
     end function aircraft_thrust
 
@@ -258,9 +266,9 @@ contains
         M(3) = 0.5*rho*V**2 * this%S_w * (this%b*(C_n))
 
         ! Apply CG shift to moments
-        M(1) = M(1) - (this%CG_shift(2)*F(3) - this%CG_shift(3)*F(2))
-        M(2) = M(2) - (this%CG_shift(3)*F(1) - this%CG_shift(1)*F(3))
-        M(3) = M(3) - (this%CG_shift(1)*F(2) - this%CG_shift(2)*F(1))
+        M(1) = M(1) + (this%CG_shift(2)*F(3) - this%CG_shift(3)*F(2))
+        M(2) = M(2) + (this%CG_shift(3)*F(1) - this%CG_shift(1)*F(3))
+        M(3) = M(3) + (this%CG_shift(1)*F(2) - this%CG_shift(2)*F(1))
 
         ! Add thrust influence
         thrust = this%thrust(t, y, throttle)
@@ -270,8 +278,8 @@ contains
         M(3) = M(3) + (this%t_location(1)*thrust(2) - this%t_location(2)*thrust(1))
         
         if (verbose) then
-            write(*,*) "F: ", F
-            write(*,*) "M: ", M
+            write(*,'(A,3ES20.12)') "F: ", F
+            write(*,'(A,3ES20.12)') "M: ", M
         end if
         
     end subroutine aircraft_aerodynamics

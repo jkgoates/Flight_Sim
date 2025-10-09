@@ -4,18 +4,16 @@ program main
     implicit none
 
     character(len=100) :: input_file
-    type(json_value), pointer :: j_main
+    real :: alt(11)
+    real :: Z, rho, P, T, a
+    integer :: i
 
 
     ! Get input file from command line
     call get_command_argument(1, input_file)
 
-    ! Load JSON file
-    call jsonx_load(input_file, j_main)
-    ! call init(input_file)
+    call init(input_file)
 
-    call run(j_main)
+    call run()
 
-
-    
 end program main
