@@ -243,7 +243,7 @@ contains
         ! Calculate error
         if (present(beta)) then
             !error = norm2(abs(calc_R(V, H, euler,rot_rates, G, beta)))
-            error = norm2(matmul(J,dG))
+            error = maxval(matmul(J,dG))
         else
             !error = norm2(calc_R(V, H, euler,rot_rates, G))
             error = maxval(abs(matmul(J,dG)))
@@ -268,6 +268,14 @@ contains
         logical :: found_beta
 
         call jsonx_get(j_main, "initial.trim.type", trim_type)
+        call json_get(j_main, "initial.trim.elevation_angle[deg]", theta, found)
+        if (.not. found) then
+            call json_get(j_main, "initial.trim.climb_angle[deg]", climb_angle, found)
+            if (.not. found) then
+                write(*,*) "User must specify a elevation or climb angle. Quitting..."
+                stop
+            end if
+        end if
         call jsonx_get(j_main, "initial.trim.solver.finite_differenc_step_size", fd_step, default_value=0.01)
         call jsonx_get(j_main, "initial.trim.solver.relaxation_factor", relaxation, default_value=0.9)
         call jsonx_get(j_main, "initial.trim.solver.tolerance", tol)
@@ -313,6 +321,8 @@ contains
                 v = V_mag*sin(G(2))
                 w = V_mag*sin(G(1))*cos(G(2))
             end if
+
+            ! Calculate elevation angle
             
 
             ! Calculate rotation rates
