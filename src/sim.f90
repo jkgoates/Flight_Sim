@@ -3,6 +3,7 @@ module simulation_m
     use aircraft_m
     use jsonx_m
     use linalg_mod
+    use micro_time_m
 
     implicit none
     
@@ -392,7 +393,7 @@ contains
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !!!! FOR USE WITH CHAPTER 6 EXAMPLES !!!!
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine init(filename)
+    subroutine init_6(filename)
 
         implicit none
         
@@ -463,73 +464,73 @@ contains
 
         end if
 
-    end subroutine init
+    end subroutine init_6
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !!!! FOR USE WITH CHAPTER 5 EXAMPLES !!!!
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !subroutine init(filename)
+    subroutine init_5(filename)
 
-        !implicit none
+        implicit none
         
-        !character(len=100), intent(in) :: filename
-        !type(json_value), pointer :: j_aircraft
-        !real :: V, H, theta, phi, psi
-        !real :: alpha, beta, p, q, r
-        !real :: da, de, dr, throttle
+        character(len=100), intent(in) :: filename
+        type(json_value), pointer :: j_aircraft
+        real :: V, H, theta, phi, psi
+        real :: alpha, beta, p, q, r
+        real :: da, de, dr, throttle
 
-        !! Load JSON file
-        !call jsonx_load(filename, j_main)
+        ! Load JSON file
+        call jsonx_load(filename, j_main)
 
-        !! Initialize vehicle
-        !call jsonx_get(j_main, "vehicle", j_aircraft)
-        !call vehicle%init(j_aircraft)
+        ! Initialize vehicle
+        call jsonx_get(j_main, "vehicle", j_aircraft)
+        call vehicle%init(j_aircraft)
 
-        !call jsonx_get(j_main, "simulation.verbose", verbose, default_value=.false.)
-        !call jsonx_get(j_main, "initial.airspeed[ft/s]", V)
-        !call jsonx_get(j_main, "initial.altitude[ft]", H)
-        !call jsonx_get(j_main, "initial.elevation_angle[deg]", theta, default_value=0.0)
-        !call jsonx_get(j_main, "initial.bank_angle[deg]", phi, default_value=0.0)
-        !call jsonx_get(j_main, "initial.heading_angle[deg]", psi, default_value=0.0)
-        !call jsonx_get(j_main, "initial.alpha[deg]", alpha, default_value=0.0)
-        !call jsonx_get(j_main, "initial.beta[deg]", beta, default_value=0.0)
-        !call jsonx_get(j_main, "initial.p[deg/s]", p, default_value=0.0)
-        !call jsonx_get(j_main, "initial.q[deg/s]", q, default_value=0.0)
-        !call jsonx_get(j_main, "initial.r[deg/s]", r, default_value =0.0)
-        !call jsonx_get(j_main, "initial.aileron[deg]", da, default_value=0.0)
-        !call jsonx_get(j_main, "initial.elevator[deg]", de, default_value=0.0)
-        !call jsonx_get(j_main, "initial.rudder[deg]", dr, default_value=0.0)
-        !call jsonx_get(j_main, "initial.throttle", throttle, default_value=0.0)
+        call jsonx_get(j_main, "simulation.verbose", verbose, default_value=.false.)
+        call jsonx_get(j_main, "initial.airspeed[ft/s]", V)
+        call jsonx_get(j_main, "initial.altitude[ft]", H)
+        call jsonx_get(j_main, "initial.elevation_angle[deg]", theta, default_value=0.0)
+        call jsonx_get(j_main, "initial.bank_angle[deg]", phi, default_value=0.0)
+        call jsonx_get(j_main, "initial.heading_angle[deg]", psi, default_value=0.0)
+        call jsonx_get(j_main, "initial.alpha[deg]", alpha, default_value=0.0)
+        call jsonx_get(j_main, "initial.beta[deg]", beta, default_value=0.0)
+        call jsonx_get(j_main, "initial.p[deg/s]", p, default_value=0.0)
+        call jsonx_get(j_main, "initial.q[deg/s]", q, default_value=0.0)
+        call jsonx_get(j_main, "initial.r[deg/s]", r, default_value =0.0)
+        call jsonx_get(j_main, "initial.aileron[deg]", da, default_value=0.0)
+        call jsonx_get(j_main, "initial.elevator[deg]", de, default_value=0.0)
+        call jsonx_get(j_main, "initial.rudder[deg]", dr, default_value=0.0)
+        call jsonx_get(j_main, "initial.throttle", throttle, default_value=0.0)
 
-        !controls(1) = da*PI/180.
-        !controls(2) = de*PI/180.
-        !controls(3) = dr*PI/180.
-        !controls(4) = throttle
+        controls(1) = da*PI/180.
+        controls(2) = de*PI/180.
+        controls(3) = dr*PI/180.
+        controls(4) = throttle
 
-        !! Set initial conditions
-        !phi   = phi   *PI/180.
-        !theta = theta *PI/180.
-        !psi   = psi   *PI/180.
+        ! Set initial conditions
+        phi   = phi   *PI/180.
+        theta = theta *PI/180.
+        psi   = psi   *PI/180.
         
-        !alpha = alpha *PI/180.
-        !beta  = beta  *PI/180.
+        alpha = alpha *PI/180.
+        beta  = beta  *PI/180.
 
-        !y_init = 0.0
+        y_init = 0.0
 
-        !y_init = V*cos(alpha)*cos(beta)
-        !y_init(2) = V*sin(beta)
-        !y_init(3) = V*sin(alpha)*cos(beta)
+        y_init = V*cos(alpha)*cos(beta)
+        y_init(2) = V*sin(beta)
+        y_init(3) = V*sin(alpha)*cos(beta)
 
 
-        !y_init(4) = p*PI/180.
-        !y_init(5) = q*PI/180.
-        !y_init(6) = r*PI/180.
+        y_init(4) = p*PI/180.
+        y_init(5) = q*PI/180.
+        y_init(6) = r*PI/180.
 
-        !y_init(9) = -H
+        y_init(9) = -H
 
-        !y_init(10:13) = euler_to_quat([phi, theta, psi])
+        y_init(10:13) = euler_to_quat([phi, theta, psi])
 
-    !end subroutine init
+    end subroutine init_5
 
     subroutine run()
 
@@ -566,16 +567,17 @@ contains
 
         if (t_R) then
             y_temp = y
-            call cpu_time(t_p)
+            t_p = get_time()
             y = runge_kutta(t, y, 0.01)
-            call cpu_time(t_c)
+            t_c = get_time()
             dt = t_c - t_p
             y = y_temp
             t_p = t_c
         end if
 
 
-        call cpu_time(start_time)
+
+        start_time = get_time()
         ! Run simulation
         do while (t < tf)
 
@@ -588,7 +590,7 @@ contains
             y = runge_kutta(t, y, dt)
             t = t + dt
             if (t_R) then
-                call cpu_time(t_c)
+                t_c = get_time()
                 dt = t_c - t_p
                 t_p = t_c
             end if
@@ -605,7 +607,7 @@ contains
                             ,y(6),',',y(7),',',y(8),',',y(9),',',y(10),',',y(11),',',y(12),',',y(13)
 
         end do
-        call cpu_time(end_time)
+        end_time = get_time()
 
         close(io_unit)
 

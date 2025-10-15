@@ -9,7 +9,7 @@ COM_DIR = common
 BIN_DIR = bin
 
 # List common files (ordered based on dependency)
-COMMON_FILES = json.f90 jsonx.f90 linalg.f90
+COMMON_FILES = json.f90 jsonx.f90 linalg.f90 micro_time.f90
 COMMON_PATHS = $(addprefix $(COM_DIR)/, $(COMMON_FILES))
 
 # List source files (ordered based on dependency)
