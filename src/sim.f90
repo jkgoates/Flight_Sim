@@ -267,6 +267,17 @@ contains
         real :: error, gravity
         logical :: found_beta
 
+        ! DR. HUNSAKER CODE j
+        ! PULL OUT SOLVER
+        !   INCLUDE VERBOSE FLAG
+        ! SOLVE BANK AND SOLVE ELEVATION LOGICAL
+        ! SCT
+        !   GET BANK
+        ! SHSS
+        !   GET BANK OR SIDESLIP
+        ! ONLY ONE FUNCTION (CALC_R IS THE ONLY OTHER FUNCTION BECAUSE IT IS CALLED MULTIPLE TIMES)
+        ! CALC R HAS SOLVE BANK LOGICAL
+
         call jsonx_get(j_main, "initial.trim.type", trim_type)
         call json_get(j_main, "initial.trim.elevation_angle[deg]", theta, found)
         if (.not. found) then
