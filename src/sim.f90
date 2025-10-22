@@ -128,29 +128,34 @@ contains
     !end function get_controls
 
     ! Trim Functions
-    function calc_R(V, H, euler, rot_rates, G, beta) result(R)
+    function calc_R(V, H, rot_rates, G, var, theta, psi, solve_bank) result(R)
 
         implicit none
-        real, intent(in) :: V, H, G(6), rot_rates(3)
-        real, intent(inout) :: euler(3)
-        real, intent(in), optional :: beta
+        real, intent(in) :: V, H, G(6), rot_rates(3), var, theta, psi
+        logical, intent(in) :: solve_bank
+        real :: alpha, beta, phi, 
         real :: R(6)
 
         real :: y_temp(13), dy_dt(13)
 
-        y_temp = 0.0
+
+        ! Parse G
+        alpha = G(1)
+        if (solve_bank) then
+            beta = var
+            phi = G(2)
+        else
+            beta = G(2)
+            phi = var
+        end if
+        controls = G(3:6)
 
         ! Set state
-        if (present(beta)) then
-            y_temp(1) = V*cos(G(1))*cos(beta)
-            y_temp(2) = V*sin(beta)
-            y_temp(3) = V*sin(G(1))*cos(beta)
-        else 
-            y_temp(1) = V*cos(G(1))*cos(G(2))
-            y_temp(2) = V*sin(G(2))
-            y_temp(3) = V*sin(G(1))*cos(G(2))
-        end if
+        y_temp = 0.0
 
+        y_temp(1) = V*cos(alpha)*cos(beta)
+        y_temp(2) = V*sin(beta)
+        y_temp(3) = V*sin(alpha)*cos(beta)
 
         y_temp(4) = rot_rates(1)
         y_temp(5) = rot_rates(2)
@@ -158,12 +163,7 @@ contains
 
         y_temp(9) = -H
 
-        if (present(beta)) euler(1) = G(2)
-
-        y_temp(10:13) = euler_to_quat(euler)
-
-        ! Set Controls
-        controls = G(3:6)
+        y_temp(10:13) = euler_to_quat((/phi, theta, psi/))
 
         ! Run diff_eq
         dy_dt = differential_equations(0.0, y_temp)
@@ -172,102 +172,103 @@ contains
 
     end function calc_R
 
-    subroutine newtons_solver(V, H, euler, rot_rates, G, delta, relaxation, error, beta)
+    !subroutine newtons_solver(V, H, euler, rot_rates, G, delta, relaxation, error, beta)
 
-        implicit none
-        real, intent(in) :: V, H, rot_rates(3), delta, relaxation
-        real, intent(inout) :: G(6), error, euler(3)
-        real, intent(in), optional :: beta
+        !implicit none
+        !real, intent(in) :: V, H, rot_rates(3), delta, relaxation
+        !real, intent(inout) :: G(6), error, euler(3)
+        !real, intent(in), optional :: beta
 
-        real :: R(6), R_1(6), R_2(6), J(6,6)
-        real, dimension(:), allocatable :: dG
+        !real :: R(6), R_1(6), R_2(6), J(6,6)
+        !real, dimension(:), allocatable :: dG
 
-        integer :: i, k
+        !integer :: i, k
 
-        write(*,*) "Received Rotation Rates (deg/s):"
-        write(*,*) " p = ", rot_rates(1)*180/PI
-        write(*,*) " q = ", rot_rates(2)*180/PI
-        write(*,*) " r = ", rot_rates(3)*180/PI
+        !write(*,*) "Received Rotation Rates (deg/s):"
+        !write(*,*) " p = ", rot_rates(1)*180/PI
+        !write(*,*) " q = ", rot_rates(2)*180/PI
+        !write(*,*) " r = ", rot_rates(3)*180/PI
 
-        ! Assemble Jacobian
-        do k = 1,6
-            write(*,*) "Calculating gradient relative to G(", k, ")"
-            G(k) = G(k) + delta
-            write(*,*) "    Positive Finite Difference Step"
-            write(*,'(A,6ES20.12)') "        G = ", G
-            if (present(beta)) then
-                R_1 = calc_R(V, H, euler, rot_rates, G, beta)
-                write(*,*) "USING BETA"
-            else
-                R_1 = calc_R(V, H, euler, rot_rates, G)
-            end if
-            write(*,'(A,6ES20.12)') "        R = ", R_1
-            G(k) = G(k) - 2*delta
-            write(*,*) "    Negative Finite Difference Step"
-            write(*,'(A,6ES20.12)') "        G = ", G
-            if (present(beta)) then
-                R_2 = calc_R(V, H, euler, rot_rates, G, beta)
-                write(*,*) "USING BETA"
-            else
-                R_2 = calc_R(V, H, euler, rot_rates, G)
-            end if
-            write(*,'(A,6ES20.12)') "        R = ", R_2
-            do i = 1,6
-                J(i,k) = (R_1(i) - R_2(i))/(2*delta)
-            end do
-            G(k) = G(k) + delta
-        end do
+        !! Assemble Jacobian
+        !do k = 1,6
+            !write(*,*) "Calculating gradient relative to G(", k, ")"
+            !G(k) = G(k) + delta
+            !write(*,*) "    Positive Finite Difference Step"
+            !write(*,'(A,6ES20.12)') "        G = ", G
+            !if (present(beta)) then
+                !R_1 = calc_R(V, H, euler, rot_rates, G, beta)
+                !write(*,*) "USING BETA"
+            !else
+                !R_1 = calc_R(V, H, euler, rot_rates, G)
+            !end if
+            !write(*,'(A,6ES20.12)') "        R = ", R_1
+            !G(k) = G(k) - 2*delta
+            !write(*,*) "    Negative Finite Difference Step"
+            !write(*,'(A,6ES20.12)') "        G = ", G
+            !if (present(beta)) then
+                !R_2 = calc_R(V, H, euler, rot_rates, G, beta)
+                !write(*,*) "USING BETA"
+            !else
+                !R_2 = calc_R(V, H, euler, rot_rates, G)
+            !end if
+            !write(*,'(A,6ES20.12)') "        R = ", R_2
+            !do i = 1,6
+                !J(i,k) = (R_1(i) - R_2(i))/(2*delta)
+            !end do
+            !G(k) = G(k) + delta
+        !end do
 
-        ! Calculate R
-        if (present(beta)) then
-            R = calc_R(V, H, euler, rot_rates, G, beta)
-        else
-            R = calc_R(V, H, euler, rot_rates, G)
-        end if
+        !! Calculate R
+        !if (present(beta)) then
+            !R = calc_R(V, H, euler, rot_rates, G, beta)
+        !else
+            !R = calc_R(V, H, euler, rot_rates, G)
+        !end if
 
-        write(*,*) "Jacobian J = "
-        do i = 1,6
-            write(*,'(6ES20.12)') J(i,:)
-        end do
+        !write(*,*) "Jacobian J = "
+        !do i = 1,6
+            !write(*,'(6ES20.12)') J(i,:)
+        !end do
 
-        call lu_solve(6, J, -R, dG)
+        !call lu_solve(6, J, -R, dG)
 
 
-        ! Update G
-        G = G + relaxation*dG
+        !! Update G
+        !G = G + relaxation*dG
 
-        write(*,*) 
-        write(*,'(A,6ES20.12)') "Delta G: ", dG
-        write(*,'(A,6ES20.12)') "New G:   ", G
+        !write(*,*) 
+        !write(*,'(A,6ES20.12)') "Delta G: ", dG
+        !write(*,'(A,6ES20.12)') "New G:   ", G
         
-        ! Calculate error
-        if (present(beta)) then
-            !error = norm2(abs(calc_R(V, H, euler,rot_rates, G, beta)))
-            error = maxval(matmul(J,dG))
-        else
-            !error = norm2(calc_R(V, H, euler,rot_rates, G))
-            error = maxval(abs(matmul(J,dG)))
-        end if
+        !! Calculate error
+        !if (present(beta)) then
+            !error = maxval(abs(calc_R(V, H, euler,rot_rates, G, beta)))
+            !!error = maxval(matmul(J,dG))
+        !else
+            !error = maxval(abs(calc_R(V, H, euler,rot_rates, G)))
+            !!error = maxval(abs(matmul(J,dG)))
+        !end if
 
-    end subroutine newtons_solver
+    !end subroutine newtons_solver
 
-    subroutine trim_solver(V_mag, H, euler)
+    subroutine trim_solver(V_mag, H)
 
         implicit none
         
         real, intent(in) :: V_mag, H
-        real, intent(inout) :: euler(3)
         real :: y(13)
 
         real :: fd_step, relaxation, tol
         integer :: i, max_iter
         character(len=:), allocatable :: trim_type
-        real :: u, v, w, rot_rates(3), G(6), R(6)
+        real :: u, v, w, rot_rates(3), G(6), R(6), R_1(6), R_2(6), J(6,6)
         real :: alpha, beta, da, de, dr, throttle
+        real :: phi, theta, psi
         real :: error, gravity
         logical :: found_beta
+        logical :: solve_bank, solve_elev
 
-        ! DR. HUNSAKER CODE j
+        ! DR. HUNSAKER CODE
         ! PULL OUT SOLVER
         !   INCLUDE VERBOSE FLAG
         ! SOLVE BANK AND SOLVE ELEVATION LOGICAL
@@ -279,14 +280,6 @@ contains
         ! CALC R HAS SOLVE BANK LOGICAL
 
         call jsonx_get(j_main, "initial.trim.type", trim_type)
-        call json_get(j_main, "initial.trim.elevation_angle[deg]", theta, found)
-        if (.not. found) then
-            call json_get(j_main, "initial.trim.climb_angle[deg]", climb_angle, found)
-            if (.not. found) then
-                write(*,*) "User must specify a elevation or climb angle. Quitting..."
-                stop
-            end if
-        end if
         call jsonx_get(j_main, "initial.trim.solver.finite_differenc_step_size", fd_step, default_value=0.01)
         call jsonx_get(j_main, "initial.trim.solver.relaxation_factor", relaxation, default_value=0.9)
         call jsonx_get(j_main, "initial.trim.solver.tolerance", tol)
@@ -306,43 +299,69 @@ contains
 
         ! Initialize
         G = 0.0
+        alpha = 0.0
+        beta = 0.0
+        phi = 0.0
+        theta = 0.0
+        psi = 0.0
         u = 0.0
         v = 0.0
         w = 0.0
         rot_rates = 0.0
 
-
         ! Check for sideslip angle
+        call json_get(j_main, "initial.trim.bank_angle[deg]", phi, found)
         if (trim_type == "shss") then
-            call json_get(j_main, "initial.trim.sideslip[deg]", beta, found_beta)
+            call json_get(j_main, "initial.trim.sideslip[deg]", beta, solve_bank)
             beta = beta*PI/180.
         else
-            found_beta = .false.
+            solve_bank = .false.
+        end if
+
+        ! Check for elevation angle
+        call json_get(j_main, "initial.trim.elevation_angle[deg]", theta, found)
+        if (.not. found) then
+            call json_get(j_main, "initial.trim.climb_angle[deg]", climb_angle, found)
+            if (.not. found) then
+                solve_elev = .false.
+                write(*,*) "User must specify a elevation or climb angle. Quitting..."
+                stop
+            else
+                solve_elev = .true.
+            end if
         end if
 
         do i = 1, max_iter
 
             ! Calculate velocities
-            if (found_beta) then
-                u = V_mag*cos(G(1))*cos(beta)
-                v = V_mag*sin(beta)
-                w = V_mag*sin(G(1))*cos(beta)
-            else
-                u = V_mag*cos(G(1))*cos(G(2))
-                v = V_mag*sin(G(2))
-                w = V_mag*sin(G(1))*cos(G(2))
-            end if
+            u = V_mag*cos(alpha)*cos(beta)
+            v = V_mag*sin(beta)
+            w = V_mag*sin(alpha)*cos(beta)
 
-            ! Calculate elevation angle
-            
+            if (solve_elev) then
+                ! Calculate elevation angle
+                theta_1 = asin((u*V_mag*sin(gamma) + (v*sin(phi) + w*cos(phi))*sqrt(u**2 + (v*sin(phi) + w*cos(phi))**2 - V_mag**2 * sin(gamma)))/(u**2 + (v*sin(phi) + w*cos(phi))**2))
+                theta_2 = asin((u*V_mag*sin(gamma) - (v*sin(phi) + w*cos(phi))*sqrt(u**2 + (v*sin(phi) + w*cos(phi))**2 - V_mag**2 * sin(gamma)))/(u**2 + (v*sin(phi) + w*cos(phi))**2))
+                gamma_1 = asin((u*sin(theta_1) - (v*sin(phi) + w*cos(phi))*cos(theta_1))/V_mag)
+                gamma_2 = asin((u*sin(theta_2) - (v*sin(phi) + w*cos(phi))*cos(theta_2))/V_mag)
+
+                if (abs(gamma_1 - gamma) < 1.e-12) then
+                    theta = theta_1
+                else if (abs(gamma_2 - gamma) < 1.e-12) then
+                    theta = theta_2
+                else
+                    write(*,*) "Trim solver could not find correct elevation angle. Quitting..."
+                    stop
+                end if
+            end if
 
             ! Calculate rotation rates
             if (trim_type == "sct") then
-                rot_rates(1) = -sin(euler(2))
-                rot_rates(2) = sin(euler(1))*cos(euler(2))
-                rot_rates(3) = cos(euler(1))*cos(euler(2))
+                rot_rates(1) = -sin(theta)
+                rot_rates(2) = sin(phi)*cos(theta)
+                rot_rates(3) = cos(phi)*cos(theta)
 
-                rot_rates = rot_rates*gravity*sin(euler(1))*cos(euler(2))/(u*cos(euler(2))*cos(euler(1)) + w*sin(euler(2)))
+                rot_rates = rot_rates*gravity*sin(phi)*cos(theta)/(u*cos(theta)*cos(phi) + w*sin(theta))
 
                 write(*,*) "Updating rotation rates for steady coordinated turn:"
                 write(*,'(A,ES20.12)') "  --> p [deg/s] = ", rot_rates(1)*180./PI
@@ -351,17 +370,66 @@ contains
             end if
 
 
-            write(*,*) "G defined as G = [alpha, beta, da, de, dr, throttle]"
-            write(*,'(A,6ES20.12)') " G = ", G
-            R = calc_R(V_mag, H, euler, rot_rates, G)
-            write(*,'(A,6ES20.12)') " R = ", R
+            !write(*,*) "G defined as G = [alpha, beta, da, de, dr, throttle]"
+            !write(*,'(A,6ES20.12)') " G = ", G
+            !R = calc_R(V_mag, H, euler, rot_rates, G)
+            !write(*,'(A,6ES20.12)') " R = ", R
 
             ! Solve for trim state
-            if (found_beta) then
-                call newtons_solver(V_mag, H, euler, rot_rates, G, fd_step, relaxation, error, beta)
+            !if (found_beta) then
+                !call newtons_solver(V_mag, H, euler, rot_rates, G, fd_step, relaxation, error, beta)
+            !else
+                !call newtons_solver(V_mag, H, euler, rot_rates, G, fd_step, relaxation, error)
+            !end if
+
+            ! Set condition
+            if (solve_bank) then
+                G(2) = phi
+                var = beta
             else
-                call newtons_solver(V_mag, H, euler, rot_rates, G, fd_step, relaxation, error)
+                G(2) = beta
+                var = phi
             end if
+
+            ! Assemble Jacobian
+            do k = 1,6
+                write(*,*) "Calculating gradient relative to G(", k, ")"
+                G(k) = G(k) + fd_step
+                write(*,*) "    Positive Finite Difference Step"
+                write(*,'(A,6ES20.12)') "        G = ", G
+                R_1 = calc_R(V, H, rot_rates, G, var, theta, psi, solve_bank)
+                write(*,'(A,6ES20.12)') "        R = ", R_1
+
+                G(k) = G(k) - 2*fd_step
+                write(*,*) "    Negative Finite Difference Step"
+                write(*,'(A,6ES20.12)') "        G = ", G
+                write(*,'(A,6ES20.12)') "        R = ", R_2
+
+                do i = 1,6
+                    J(i,k) = (R_1(i) - R_2(i))/(2*fd_step)
+                end do
+                G(k) = G(k) + fd_step
+            end do
+
+            write(*,*) "Jacobian J = "
+            do i = 1,6
+                write(*,'(6ES20.12)') J(i,:)
+            end do
+
+            ! Calculate R
+            R = calc_R(V, H, rot_rates, G, var, theta, psi, solve_bank)
+
+            call lu_solve(6, J, -R, dG)
+
+            ! Update G
+            G = G + relaxation*dG
+
+            write(*,*) 
+            write(*,'(A,6ES20.12)') "Delta G: ", dG
+            write(*,'(A,6ES20.12)') "New G:   ", G
+        
+            ! Calculate error
+            error = maxval(abs(calc_R(V, H, rot_rates, G, var, theta, psi, solve_bank)))
 
 
             write(*,'(A,I4,A,ES20.12)') "Iteration: ", i, " Error: ", error
