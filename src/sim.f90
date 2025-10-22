@@ -311,10 +311,22 @@ contains
 
         ! Check for sideslip angle
         call json_get(j_main, "initial.trim.bank_angle[deg]", phi, found)
-        if (trim_type == "shss") then
-            call json_get(j_main, "initial.trim.sideslip[deg]", beta, solve_bank)
-            beta = beta*PI/180.
+        if (.not. found) then
+            if (trim_type == "shss") then
+                call json_get(j_main, "initial.trim.sideslip[deg]", beta, found)
+                if (.not. found) then
+                    write(*,*) "User must specify a bank or sideslip angle. Quitting..."
+                    stop
+                else
+                    beta = beta*PI/180.
+                    solve_bank = .true.
+                end if
+            else
+                write(*,*) "User must specify a bank angle. Quitting..."
+                stop
+            end if
         else
+            phi = phi*PI/180.
             solve_bank = .false.
         end if
 
