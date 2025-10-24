@@ -371,8 +371,10 @@ contains
                 write(*,*) "u: ", u
                 write(*,*) "v: ", v
                 write(*,*) "w: ", w
-                theta_1 = asin((u*V_mag*sin(gamma) + (v*sin(phi) + w*cos(phi))*sqrt(u**2 + (v*sin(phi) + w*cos(phi))**2 - V_mag**2 * sin(gamma)))/(u**2 + (v*sin(phi) + w*cos(phi))**2))
-                theta_2 = asin((u*V_mag*sin(gamma) - (v*sin(phi) + w*cos(phi))*sqrt(u**2 + (v*sin(phi) + w*cos(phi))**2 - V_mag**2 * sin(gamma)))/(u**2 + (v*sin(phi) + w*cos(phi))**2))
+                theta_1 = asin((u*V_mag*sin(gamma) + (v*sin(phi) + w*cos(phi))*sqrt(u**2 + (v*sin(phi) + w*cos(phi))**2 - &
+                                                            V_mag**2 * sin(gamma)))/(u**2 + (v*sin(phi) + w*cos(phi))**2))
+                theta_2 = asin((u*V_mag*sin(gamma) - (v*sin(phi) + w*cos(phi))*sqrt(u**2 + (v*sin(phi) + w*cos(phi))**2 - &
+                                                            V_mag**2 * sin(gamma)))/(u**2 + (v*sin(phi) + w*cos(phi))**2))
                 gamma_1 = asin((u*sin(theta_1) - (v*sin(phi) + w*cos(phi))*cos(theta_1))/V_mag)
                 gamma_2 = asin((u*sin(theta_2) - (v*sin(phi) + w*cos(phi))*cos(theta_2))/V_mag)
 
@@ -487,15 +489,18 @@ contains
             if (error < tol) exit
         end do 
 
-        write(*,'(A,ES20.12)') "Alpha (deg): ", G(1)*180./PI
-        write(*,'(A,ES20.12)') "Beta  (deg): ", G(2)*180./PI
+        write(*,'(A,ES20.12)') "Alpha (deg): ", alpha*180./PI
+        write(*,'(A,ES20.12)') "Beta  (deg): ", beta*180./PI
+        write(*,'(A,ES20.12)') "Phi   (deg): ", phi*180./PI
+        write(*,'(A,ES20.12)') "Theta (deg): ", theta*180./PI
+        write(*,'(A,ES20.12)') "Psi   (deg): ", psi*180./PI
         write(*,'(A,ES20.12)') "p     (deg/s): ", rot_rates(1)*180./PI
         write(*,'(A,ES20.12)') "q     (deg/s): ", rot_rates(2)*180./PI
         write(*,'(A,ES20.12)') "r     (deg/s): ", rot_rates(3)*180./PI
-        write(*,'(A,ES20.12)') "da    (deg): ", G(3)*180./PI
-        write(*,'(A,ES20.12)') "de    (deg): ", G(4)*180./PI
-        write(*,'(A,ES20.12)') "dr    (deg): ", G(5)*180./PI
-        write(*,'(A,ES20.12)') "throttle    : ", G(6)
+        write(*,'(A,ES20.12)') "da    (deg): ", da*180./PI
+        write(*,'(A,ES20.12)') "de    (deg): ", de*180./PI
+        write(*,'(A,ES20.12)') "dr    (deg): ", dr*180./PI
+        write(*,'(A,ES20.12)') "throttle    : ", throttle
 
 
         ! Set initial conditions

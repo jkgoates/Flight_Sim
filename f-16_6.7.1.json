@@ -93,8 +93,10 @@
         "type": "trim",
         "trim": {
             "type": "sct",
-            "bank_angle[deg]": 180.0,
-            "elevation_angle[deg]": 8.153227691712,
+            "bank_angle[deg]": 0.0,
+            "xelevation_angle[deg]": 8.153227691712,
+            "xxelevation_angle[deg]": 7.694005314345,
+            "climb_angle[deg]": 0.0,
             "solver": {
                 "finite_difference_step_size": 0.01,
                 "relaxation_factor": 0.9,

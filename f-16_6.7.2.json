@@ -88,7 +88,6 @@
         "airspeed[ft/s]": 520.0,
         "altitude[ft]": 2000.0,
 
-        "xEuler_angles[deg]": [0.0, 59.66804836812, 0.0],
         "type": "trim",
         "trim": {
             "type": "shss",
