@@ -133,7 +133,7 @@ contains
         implicit none
         real, intent(in) :: V, H, G(6), rot_rates(3), var, theta, psi
         logical, intent(in) :: solve_bank
-        real :: alpha, beta, phi, 
+        real :: alpha, beta, phi
         real :: R(6)
 
         real :: y_temp(13), dy_dt(13)
@@ -156,7 +156,6 @@ contains
         y_temp(1) = V*cos(alpha)*cos(beta)
         y_temp(2) = V*sin(beta)
         y_temp(3) = V*sin(alpha)*cos(beta)
-
         y_temp(4) = rot_rates(1)
         y_temp(5) = rot_rates(2)
         y_temp(6) = rot_rates(3)
@@ -259,14 +258,17 @@ contains
         real :: y(13)
 
         real :: fd_step, relaxation, tol
-        integer :: i, max_iter
+        integer :: i, k, l, max_iter
         character(len=:), allocatable :: trim_type
         real :: u, v, w, rot_rates(3), G(6), R(6), R_1(6), R_2(6), J(6,6)
+        real, dimension(:), allocatable :: dG
         real :: alpha, beta, da, de, dr, throttle
-        real :: phi, theta, psi
+        real :: phi, theta, psi, var
         real :: error, gravity
-        logical :: found_beta
+        logical :: found
         logical :: solve_bank, solve_elev
+        real :: gamma, gamma_1, gamma_2
+        real :: theta_1, theta_2
 
         ! DR. HUNSAKER CODE
         ! PULL OUT SOLVER
@@ -286,8 +288,8 @@ contains
         call jsonx_get(j_main, "initial.trim.solver.max_iterations", max_iter, default_value=100)
 
         write(*,*) "Trimming aircraft for ", trim_type
-        write(*,'(A,ES20.12)') "  --> Elevation angle set to theta [deg] = ", euler(2)*180./PI
-        write(*,'(A,ES20.12)') "  --> Bank angle set to phi [deg] = ", euler(1)*180./PI
+        !write(*,'(A,ES20.12)') "  --> Elevation angle set to theta [deg] = ", euler(2)*180./PI
+        !write(*,'(A,ES20.12)') "  --> Bank angle set to phi [deg] = ", euler(1)*180./PI
 
 
         write(*,*) "Newton Solver Settings:"
@@ -301,6 +303,7 @@ contains
         G = 0.0
         alpha = 0.0
         beta = 0.0
+        gamma = 0.0
         phi = 0.0
         theta = 0.0
         psi = 0.0
@@ -333,15 +336,24 @@ contains
         ! Check for elevation angle
         call json_get(j_main, "initial.trim.elevation_angle[deg]", theta, found)
         if (.not. found) then
-            call json_get(j_main, "initial.trim.climb_angle[deg]", climb_angle, found)
+            call json_get(j_main, "initial.trim.climb_angle[deg]", gamma, found)
             if (.not. found) then
                 solve_elev = .false.
                 write(*,*) "User must specify a elevation or climb angle. Quitting..."
                 stop
             else
+                gamma = gamma*PI/180.
                 solve_elev = .true.
             end if
+        else
+            theta = theta*PI/180.
+            solve_elev = .false.
         end if
+
+        write(*,*) "Initial theta [deg] = ", theta*180./PI
+        write(*,*) "Initial gamma [deg] = ", gamma*180./PI
+        write(*,*) "Initial phi[deg]    = ", phi*180./PI
+        write(*,*) "Initial beta[deg]   = ", beta*180./PI
 
         do i = 1, max_iter
 
@@ -352,10 +364,22 @@ contains
 
             if (solve_elev) then
                 ! Calculate elevation angle
+                write(*,*) "Calculating Elevation angle: "
+                write(*,*) "phi: ", phi
+                write(*,*) "gamma: ", gamma
+                write(*,*) "v_mag: ", V_mag
+                write(*,*) "u: ", u
+                write(*,*) "v: ", v
+                write(*,*) "w: ", w
                 theta_1 = asin((u*V_mag*sin(gamma) + (v*sin(phi) + w*cos(phi))*sqrt(u**2 + (v*sin(phi) + w*cos(phi))**2 - V_mag**2 * sin(gamma)))/(u**2 + (v*sin(phi) + w*cos(phi))**2))
                 theta_2 = asin((u*V_mag*sin(gamma) - (v*sin(phi) + w*cos(phi))*sqrt(u**2 + (v*sin(phi) + w*cos(phi))**2 - V_mag**2 * sin(gamma)))/(u**2 + (v*sin(phi) + w*cos(phi))**2))
                 gamma_1 = asin((u*sin(theta_1) - (v*sin(phi) + w*cos(phi))*cos(theta_1))/V_mag)
                 gamma_2 = asin((u*sin(theta_2) - (v*sin(phi) + w*cos(phi))*cos(theta_2))/V_mag)
+
+                write(*,*) "    Theta 1: ", theta_1*180./PI
+                write(*,*) "    Gamma 1: ", gamma_1*180./PI
+                write(*,*) "    Theta 2: ", theta_2*180./PI
+                write(*,*) "    Gamma 2: ", gamma_2*180./PI
 
                 if (abs(gamma_1 - gamma) < 1.e-12) then
                     theta = theta_1
@@ -365,6 +389,7 @@ contains
                     write(*,*) "Trim solver could not find correct elevation angle. Quitting..."
                     stop
                 end if
+                write(*,*) "    Correct theta: ", theta
             end if
 
             ! Calculate rotation rates
@@ -382,10 +407,10 @@ contains
             end if
 
 
-            !write(*,*) "G defined as G = [alpha, beta, da, de, dr, throttle]"
-            !write(*,'(A,6ES20.12)') " G = ", G
-            !R = calc_R(V_mag, H, euler, rot_rates, G)
-            !write(*,'(A,6ES20.12)') " R = ", R
+            write(*,*) "G defined as G = [alpha, beta, da, de, dr, throttle]"
+            write(*,'(A,6ES20.12)') " G = ", G
+            R = calc_R(V_mag, H, rot_rates, G, var, theta, psi, solve_bank)
+            write(*,'(A,6ES20.12)') " R = ", R
 
             ! Solve for trim state
             !if (found_beta) then
@@ -409,27 +434,28 @@ contains
                 G(k) = G(k) + fd_step
                 write(*,*) "    Positive Finite Difference Step"
                 write(*,'(A,6ES20.12)') "        G = ", G
-                R_1 = calc_R(V, H, rot_rates, G, var, theta, psi, solve_bank)
+                R_1 = calc_R(V_mag, H, rot_rates, G, var, theta, psi, solve_bank)
                 write(*,'(A,6ES20.12)') "        R = ", R_1
 
                 G(k) = G(k) - 2*fd_step
                 write(*,*) "    Negative Finite Difference Step"
                 write(*,'(A,6ES20.12)') "        G = ", G
+                R_2 = calc_R(V_mag, H, rot_rates, G, var, theta, psi, solve_bank)
                 write(*,'(A,6ES20.12)') "        R = ", R_2
 
-                do i = 1,6
-                    J(i,k) = (R_1(i) - R_2(i))/(2*fd_step)
+                do l = 1,6
+                    J(l,k) = (R_1(l) - R_2(l))/(2*fd_step)
                 end do
                 G(k) = G(k) + fd_step
             end do
 
             write(*,*) "Jacobian J = "
-            do i = 1,6
-                write(*,'(6ES20.12)') J(i,:)
+            do k = 1,6
+                write(*,'(6ES20.12)') J(k,:)
             end do
 
             ! Calculate R
-            R = calc_R(V, H, rot_rates, G, var, theta, psi, solve_bank)
+            R = calc_R(V_mag, H, rot_rates, G, var, theta, psi, solve_bank)
 
             call lu_solve(6, J, -R, dG)
 
@@ -441,18 +467,22 @@ contains
             write(*,'(A,6ES20.12)') "New G:   ", G
         
             ! Calculate error
-            error = maxval(abs(calc_R(V, H, rot_rates, G, var, theta, psi, solve_bank)))
+            error = maxval(abs(calc_R(V_mag, H, rot_rates, G, var, theta, psi, solve_bank)))
 
 
             write(*,'(A,I4,A,ES20.12)') "Iteration: ", i, " Error: ", error
 
-            !! Update alpha, beta, and controls
-            !alpha = G(1)
-            !beta = G(2)
-            !da = G(3)
-            !de = G(4)
-            !dr = G(5)
-            !throttle = G(6)
+            ! Update alpha, beta, and controls
+            alpha = G(1)
+            if (solve_bank) then
+                phi = G(2)
+            else
+                beta = G(2)
+            end if
+            da = G(3)
+            de = G(4)
+            dr = G(5)
+            throttle = G(6)
         
             if (error < tol) exit
         end do 
@@ -487,7 +517,7 @@ contains
 
         y_init(9) = -H
 
-        y_init(10:13) = euler_to_quat(euler)
+        y_init(10:13) = euler_to_quat((/phi, theta, psi/))
 
     end subroutine trim_solver
 
@@ -516,9 +546,9 @@ contains
         call jsonx_get(j_main, "simulation.verbose", verbose, default_value=.false.)
         call jsonx_get(j_main, "initial.airspeed[ft/s]", V)
         call jsonx_get(j_main, "initial.altitude[ft]", H)
-        call jsonx_get(j_main, "initial.Euler_angles[deg]", euler, 0.0, 3)
+        !call jsonx_get(j_main, "initial.Euler_angles[deg]", euler, 0.0, 3)
 
-        euler = euler*PI/180.
+        !euler = euler*PI/180.
 
         ! Get type of initialization
         call jsonx_get(j_main, "initial.type", init_type)
@@ -561,7 +591,7 @@ contains
 
         else if (init_type == "trim") then
             ! Get trim settings
-            call trim_solver(V, H, euler)
+            call trim_solver(V, H)
 
         end if
 

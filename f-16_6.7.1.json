@@ -89,10 +89,12 @@
         "airspeed[ft/s]": 330.0,
         "altitude[ft]": 1000.0,
 
-        "Euler_angles[deg]": [60.0, 7.694005314345, 0.0],
+        "xEuler_angles[deg]": [60.0, 7.694005314345, 0.0],
         "type": "trim",
         "trim": {
             "type": "sct",
+            "bank_angle[deg]": 180.0,
+            "elevation_angle[deg]": 8.153227691712,
             "solver": {
                 "finite_difference_step_size": 0.01,
                 "relaxation_factor": 0.9,
