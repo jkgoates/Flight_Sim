@@ -336,6 +336,7 @@ contains
         ! Check for elevation angle
         call json_get(j_main, "initial.trim.elevation_angle[deg]", theta, found)
         if (.not. found) then
+            theta = 0.0
             call json_get(j_main, "initial.trim.climb_angle[deg]", gamma, found)
             if (.not. found) then
                 solve_elev = .false.
@@ -372,9 +373,9 @@ contains
                 write(*,*) "v: ", v
                 write(*,*) "w: ", w
                 theta_1 = asin((u*V_mag*sin(gamma) + (v*sin(phi) + w*cos(phi))*sqrt(u**2 + (v*sin(phi) + w*cos(phi))**2 - &
-                                                            V_mag**2 * sin(gamma)))/(u**2 + (v*sin(phi) + w*cos(phi))**2))
+                                                            V_mag**2 * sin(gamma)**2))/(u**2 + (v*sin(phi) + w*cos(phi))**2))
                 theta_2 = asin((u*V_mag*sin(gamma) - (v*sin(phi) + w*cos(phi))*sqrt(u**2 + (v*sin(phi) + w*cos(phi))**2 - &
-                                                            V_mag**2 * sin(gamma)))/(u**2 + (v*sin(phi) + w*cos(phi))**2))
+                                                            V_mag**2 * sin(gamma)**2))/(u**2 + (v*sin(phi) + w*cos(phi))**2))
                 gamma_1 = asin((u*sin(theta_1) - (v*sin(phi) + w*cos(phi))*cos(theta_1))/V_mag)
                 gamma_2 = asin((u*sin(theta_2) - (v*sin(phi) + w*cos(phi))*cos(theta_2))/V_mag)
 
@@ -463,6 +464,7 @@ contains
 
             ! Update G
             G = G + relaxation*dG
+            if (G(6) < 0.0) G(6) = 0.0
 
             write(*,*) 
             write(*,'(A,6ES20.12)') "Delta G: ", dG
@@ -491,16 +493,19 @@ contains
 
         write(*,'(A,ES20.12)') "Alpha (deg): ", alpha*180./PI
         write(*,'(A,ES20.12)') "Beta  (deg): ", beta*180./PI
-        write(*,'(A,ES20.12)') "Phi   (deg): ", phi*180./PI
-        write(*,'(A,ES20.12)') "Theta (deg): ", theta*180./PI
-        write(*,'(A,ES20.12)') "Psi   (deg): ", psi*180./PI
         write(*,'(A,ES20.12)') "p     (deg/s): ", rot_rates(1)*180./PI
         write(*,'(A,ES20.12)') "q     (deg/s): ", rot_rates(2)*180./PI
         write(*,'(A,ES20.12)') "r     (deg/s): ", rot_rates(3)*180./PI
+        write(*,'(A,ES20.12)') "Phi   (deg): ", phi*180./PI
+        write(*,'(A,ES20.12)') "Theta (deg): ", theta*180./PI
         write(*,'(A,ES20.12)') "da    (deg): ", da*180./PI
         write(*,'(A,ES20.12)') "de    (deg): ", de*180./PI
         write(*,'(A,ES20.12)') "dr    (deg): ", dr*180./PI
         write(*,'(A,ES20.12)') "throttle    : ", throttle
+        write(*,'(11A20)') "alpha[deg]", "beta[deg]", "p[deg/s]", "q[deg/s]", "r[deg/s]", "phi[deg]", &
+                             "theta[deg]", "da[deg]", "de[deg]", "dr[deg]", "throttle"
+        write(*,'(11ES20.12)') alpha*180./PI, beta*180./PI, rot_rates(1)*180./PI, rot_rates(2)*180./PI, &
+                    rot_rates(3)*180./PI, phi*180./PI, theta*180./PI, da*180./PI, de*180./PI, dr*180./PI, throttle
 
 
         ! Set initial conditions

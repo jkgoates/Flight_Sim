@@ -87,13 +87,11 @@
     "initial": {
         "airspeed[ft/s]": 520.0,
         "altitude[ft]": 2000.0,
-
-        "xEuler_angles[deg]": [0.0, 17.90605229467, 0.0],
         "type": "trim",
         "trim": {
             "type": "shss",
-            "elevation_angle[deg]": 7.796238144056,
-            "sideslip[deg]": 10.0,
+            "elevation_angle[deg]": 85.89784263429,
+            "sideslip[deg]": 1.0,
             "solver": {
                 "finite_difference_step_size": 0.01,
                 "relaxation_factor": 0.9,
