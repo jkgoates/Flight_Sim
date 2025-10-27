@@ -8,9 +8,8 @@ module simulation_m
     implicit none
     
     type(aircraft) :: vehicle
-    ! Private control parameters
-    real, parameter :: one_sixth = 1./6.
 
+    real, parameter :: one_sixth = 1./6.
     real :: controls(4)
     real :: y_init(13)
     type(json_value), pointer :: j_main
@@ -46,7 +45,6 @@ contains
         real :: dy_dt(13)
 
         real :: mass, I(3,3), F(3), M(3), g, I_inv(3,3), dummy(3), h(3)
-        !real :: controls(4)
 
         if (verbose) then
             write(*,*) "t: ", t
@@ -54,8 +52,6 @@ contains
         end if
 
         g = gravity_English(-y(9))
-
-        !controls = get_controls(t, y)
 
         call vehicle%mass_inertia(t, y, mass, I)
         call vehicle%aerodynamics(t, y, F, M, controls)
@@ -110,24 +106,8 @@ contains
             write(*,*) "----------------------"
         end if
 
-
     end function differential_equations
 
-    !function get_controls(t, y) result(controls)
-
-        !implicit none
-        !real, intent(in) :: t, y(13)
-        !real :: controls(4)
-
-        !! Get control inputs
-        !controls(1) = da*PI/180.
-        !controls(2) = de*PI/180.
-        !controls(3) = dr*PI/180.
-        !controls(4) = throttle
-
-    !end function get_controls
-
-    ! Trim Functions
     function calc_R(V, H, rot_rates, G, var, theta, psi, solve_bank) result(R)
 
         implicit none
@@ -171,86 +151,7 @@ contains
 
     end function calc_R
 
-    !subroutine newtons_solver(V, H, euler, rot_rates, G, delta, relaxation, error, beta)
-
-        !implicit none
-        !real, intent(in) :: V, H, rot_rates(3), delta, relaxation
-        !real, intent(inout) :: G(6), error, euler(3)
-        !real, intent(in), optional :: beta
-
-        !real :: R(6), R_1(6), R_2(6), J(6,6)
-        !real, dimension(:), allocatable :: dG
-
-        !integer :: i, k
-
-        !write(*,*) "Received Rotation Rates (deg/s):"
-        !write(*,*) " p = ", rot_rates(1)*180/PI
-        !write(*,*) " q = ", rot_rates(2)*180/PI
-        !write(*,*) " r = ", rot_rates(3)*180/PI
-
-        !! Assemble Jacobian
-        !do k = 1,6
-            !write(*,*) "Calculating gradient relative to G(", k, ")"
-            !G(k) = G(k) + delta
-            !write(*,*) "    Positive Finite Difference Step"
-            !write(*,'(A,6ES20.12)') "        G = ", G
-            !if (present(beta)) then
-                !R_1 = calc_R(V, H, euler, rot_rates, G, beta)
-                !write(*,*) "USING BETA"
-            !else
-                !R_1 = calc_R(V, H, euler, rot_rates, G)
-            !end if
-            !write(*,'(A,6ES20.12)') "        R = ", R_1
-            !G(k) = G(k) - 2*delta
-            !write(*,*) "    Negative Finite Difference Step"
-            !write(*,'(A,6ES20.12)') "        G = ", G
-            !if (present(beta)) then
-                !R_2 = calc_R(V, H, euler, rot_rates, G, beta)
-                !write(*,*) "USING BETA"
-            !else
-                !R_2 = calc_R(V, H, euler, rot_rates, G)
-            !end if
-            !write(*,'(A,6ES20.12)') "        R = ", R_2
-            !do i = 1,6
-                !J(i,k) = (R_1(i) - R_2(i))/(2*delta)
-            !end do
-            !G(k) = G(k) + delta
-        !end do
-
-        !! Calculate R
-        !if (present(beta)) then
-            !R = calc_R(V, H, euler, rot_rates, G, beta)
-        !else
-            !R = calc_R(V, H, euler, rot_rates, G)
-        !end if
-
-        !write(*,*) "Jacobian J = "
-        !do i = 1,6
-            !write(*,'(6ES20.12)') J(i,:)
-        !end do
-
-        !call lu_solve(6, J, -R, dG)
-
-
-        !! Update G
-        !G = G + relaxation*dG
-
-        !write(*,*) 
-        !write(*,'(A,6ES20.12)') "Delta G: ", dG
-        !write(*,'(A,6ES20.12)') "New G:   ", G
-        
-        !! Calculate error
-        !if (present(beta)) then
-            !error = maxval(abs(calc_R(V, H, euler,rot_rates, G, beta)))
-            !!error = maxval(matmul(J,dG))
-        !else
-            !error = maxval(abs(calc_R(V, H, euler,rot_rates, G)))
-            !!error = maxval(abs(matmul(J,dG)))
-        !end if
-
-    !end subroutine newtons_solver
-
-    subroutine trim_solver(V_mag, H)
+    subroutine init_trim(V_mag, H)
 
         implicit none
         
@@ -509,10 +410,10 @@ contains
 
 
         ! Set initial conditions
-        !controls(1) = da*PI/180.
-        !controls(2) = de*PI/180.
-        !controls(3) = dr*PI/180.
-        !controls(4) = throttle
+        controls(1) = da*PI/180.
+        controls(2) = de*PI/180.
+        controls(3) = dr*PI/180.
+        controls(4) = throttle
 
         y_init = 0.0
 
@@ -521,15 +422,66 @@ contains
         y_init(3) = V_mag*sin(alpha)*cos(beta)
 
 
-        y_init(4) = rot_rates(1)*PI/180.
-        y_init(5) = rot_rates(2)*PI/180.
-        y_init(6) = rot_rates(3)*PI/180.
+        y_init(4) = rot_rates(1)
+        y_init(5) = rot_rates(2)
+        y_init(6) = rot_rates(3)
 
         y_init(9) = -H
 
         y_init(10:13) = euler_to_quat((/phi, theta, psi/))
 
-    end subroutine trim_solver
+    end subroutine init_trim
+
+    subroutine init_state(V_mag, H)
+        implicit none
+        
+        real, intent(inout) :: V_mag, H
+
+        real :: alpha, beta, p, q, r, da, de, dr, throtte, phi, theta, psi
+        
+        call jsonx_get(j_main, "initial.state.alpha[deg]", alpha, default_value=0.0)
+        call jsonx_get(j_main, "initial.state.beta[deg]", beta, default_value=0.0)
+        call jsonx_get(j_main, "initial.state.p[deg/s]", p, default_value=0.0)
+        call jsonx_get(j_main, "initial.state.q[deg/s]", q, default_value=0.0)
+        call jsonx_get(j_main, "initial.state.r[deg/s]", r, default_value =0.0)
+        call jsonx_get(j_main, "initial.state.aileron[deg]", da, default_value=0.0)
+        call jsonx_get(j_main, "initial.state.elevator[deg]", de, default_value=0.0)
+        call jsonx_get(j_main, "initial.state.rudder[deg]", dr, default_value=0.0)
+        call jsonx_get(j_main, "initial.state.throttle", throttle, default_value=0.0)
+        call jsonx_get(j_main, "initial.state.phi[deg]", phi, default_value=0.0)
+        call jsonx_get(j_main, "initial.state.theta[deg]", theta, default_value=0.0)
+        call jsonx_get(j_main, "initial.state.psi[deg]", psi, default_value=0.0)
+
+        controls(1) = da*PI/180.
+        controls(2) = de*PI/180.
+        controls(3) = dr*PI/180.
+        controls(4) = throttle
+
+        phi = phi*PI/180.
+        theta = theta*PI/180.
+        psi = psi*PI/180.
+
+        ! Set initial conditions
+        alpha = alpha *PI/180.
+        beta  = beta  *PI/180.
+
+        y_init = 0.0
+
+        y_init(1) = V*cos(alpha)*cos(beta)
+        y_init(2) = V*sin(beta)
+        y_init(3) = V*sin(alpha)*cos(beta)
+
+
+        y_init(4) = p*PI/180.
+        y_init(5) = q*PI/180.
+        y_init(6) = r*PI/180.
+
+        y_init(9) = -H
+
+        y_init(10:13) = euler_to_quat((/phi, theta, psi/))
+
+    end subroutine init_state
+
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !!!! FOR USE WITH CHAPTER 6 EXAMPLES !!!!
@@ -556,55 +508,20 @@ contains
         call jsonx_get(j_main, "simulation.verbose", verbose, default_value=.false.)
         call jsonx_get(j_main, "initial.airspeed[ft/s]", V)
         call jsonx_get(j_main, "initial.altitude[ft]", H)
-        !call jsonx_get(j_main, "initial.Euler_angles[deg]", euler, 0.0, 3)
-
-        !euler = euler*PI/180.
 
         ! Get type of initialization
         call jsonx_get(j_main, "initial.type", init_type)
+
+        select case(init_type)
+        case("state")
+            call init_state(V,H)
+        case("trim")
+            call init_trim(V,H)
+        case default
+            write(*,*) "!!! Type "//init_type//" is not recognized as a valid init type. Quitting..."
+            stop
+        end select
         
-        if (init_type == "state") then
-
-            call jsonx_get(j_main, "initial.state.alpha[deg]", alpha, default_value=0.0)
-            call jsonx_get(j_main, "initial.state.beta[deg]", beta, default_value=0.0)
-            call jsonx_get(j_main, "initial.state.p[deg/s]", p, default_value=0.0)
-            call jsonx_get(j_main, "initial.state.q[deg/s]", q, default_value=0.0)
-            call jsonx_get(j_main, "initial.state.r[deg/s]", r, default_value =0.0)
-            call jsonx_get(j_main, "initial.state.aileron[deg]", da, default_value=0.0)
-            call jsonx_get(j_main, "initial.state.elevator[deg]", de, default_value=0.0)
-            call jsonx_get(j_main, "initial.state.rudder[deg]", dr, default_value=0.0)
-            call jsonx_get(j_main, "initial.state.throttle", throttle, default_value=0.0)
-
-            controls(1) = da*PI/180.
-            controls(2) = de*PI/180.
-            controls(3) = dr*PI/180.
-            controls(4) = throttle
-
-            ! Set initial conditions
-            alpha = alpha *PI/180.
-            beta  = beta  *PI/180.
-
-            y_init = 0.0
-
-            y_init(1) = V*cos(alpha)*cos(beta)
-            y_init(2) = V*sin(beta)
-            y_init(3) = V*sin(alpha)*cos(beta)
-
-
-            y_init(4) = p*PI/180.
-            y_init(5) = q*PI/180.
-            y_init(6) = r*PI/180.
-
-            y_init(9) = -H
-
-            y_init(10:13) = euler_to_quat(euler)
-
-        else if (init_type == "trim") then
-            ! Get trim settings
-            call trim_solver(V, H)
-
-        end if
-
     end subroutine init_6
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
