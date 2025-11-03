@@ -14,6 +14,8 @@ module simulation_m
     real :: y_init(13)
     type(json_value), pointer :: j_main
 
+    ! NOTES FROM DR. HUNSAKERS CODE
+    
 
 contains
     
@@ -410,9 +412,9 @@ contains
 
 
         ! Set initial conditions
-        controls(1) = da*PI/180.
-        controls(2) = de*PI/180.
-        controls(3) = dr*PI/180.
+        controls(1) = da
+        controls(2) = de
+        controls(3) = dr
         controls(4) = throttle
 
         y_init = 0.0
@@ -437,7 +439,7 @@ contains
         
         real, intent(inout) :: V_mag, H
 
-        real :: alpha, beta, p, q, r, da, de, dr, throtte, phi, theta, psi
+        real :: alpha, beta, p, q, r, da, de, dr, throttle, phi, theta, psi
         
         call jsonx_get(j_main, "initial.state.alpha[deg]", alpha, default_value=0.0)
         call jsonx_get(j_main, "initial.state.beta[deg]", beta, default_value=0.0)
@@ -467,9 +469,9 @@ contains
 
         y_init = 0.0
 
-        y_init(1) = V*cos(alpha)*cos(beta)
-        y_init(2) = V*sin(beta)
-        y_init(3) = V*sin(alpha)*cos(beta)
+        y_init(1) = V_mag*cos(alpha)*cos(beta)
+        y_init(2) = V_mag*sin(beta)
+        y_init(3) = V_mag*sin(alpha)*cos(beta)
 
 
         y_init(4) = p*PI/180.
