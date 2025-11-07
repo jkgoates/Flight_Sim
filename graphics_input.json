@@ -1,0 +1,11 @@
+{
+    "camera": {
+        "view_plane": {
+            "distance[ft]": 1.0,
+            "angle[deg]": 60.0,
+            "aspect_ratio": 2
+        },
+        "location[ft]": [-20.0, 0.0, -5.0],
+        "orientation[deg]": [5.0, -10.0, 0.0]
+    }
+}
