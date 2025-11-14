@@ -86,18 +86,19 @@
     },
     "initial": {
         "airspeed[ft/s]": 350.0,
-        "altitude[ft]": 4000.0,
-        "type": "state",
+        "altitude[ft]": 3000.0,
+        "type": "trim",
         "state": {
             "xf[ft]" : -7000.0,
             "alpha[deg]": 8,
             "elevator[deg]": -8,
-            "phi[deg]": 0.0
+            "phi[deg]": 0.0,
+            "throttle": 0.1
         },
         "trim": {
             "type": "sct",
-            "bank_angle[deg]": 0.0,
-            "climb_angle[deg]": -15.0,
+            "bank_angle[deg]": 70.0,
+            "climb_angle[deg]": 0.0,
             "solver": {
                 "finite_difference_step_size": 0.01,
                 "relaxation_factor": 0.9,

@@ -3,6 +3,7 @@ import numpy as np
 import json
 import sys
 import scipy as sp
+import time
 from connection_m import connection
 
 class Camera:
@@ -118,7 +119,7 @@ class Grid:
             self.lamb[i] = np.dot(cam.P_0-cam.pos,cam.n_vp)/np.dot(self.I_ca[i,:],cam.n_vp)
             self.P_b_c[i,:] = self.lamb[i]*self.I_ca[i,:]
 
-        temp = np.transpose(np.matmul(cam.R, np.transpose(self.P_b_c)))
+        temp = np.transpose(np.matmul((cam.R), np.transpose(self.P_b_c)))
         self.points_vp[:,0] = temp[:,1]
         self.points_vp[:,1] = -temp[:,2]
 
@@ -132,21 +133,42 @@ class Grid:
                 self.lines_vp[3*i,   :] = None
                 self.lines_vp[3*i+1, :] = None
             # only one behind camera
-            elif (self.lamb[i0] < 0.0):
-                temp = self.points_vp[i0,:] - self.lamb[i0]*(self.points_vp[i0,:] - self.points_vp[i1,:])/(self.lamb[i0] - self.lamb[i1])
-                self.lines_vp[3*i, :] =   temp
-                self.lines_vp[3*i+1, :] = self.points_vp[i1,:]
             elif (self.lamb[i1] < 0.0):
-                temp = self.points_vp[i1,:] - self.lamb[i1]*(self.points_vp[i1,:] - self.points_vp[i0,:])/(self.lamb[i1] - self.lamb[i0])
+                l10_f = self.points_f[i1,:] - self.points_f[i0,:]
+                lamb_temp = np.dot(cam.P_0-self.points_f[i0,:], cam.n_vp)/np.dot(l10_f, cam.n_vp)
+                point_f = self.points_f[i0,:] + lamb_temp*l10_f - cam.pos
+                temp = np.matmul((cam.R),point_f)
+                point = np.zeros(2)
+                point[0] = temp[1]
+                point[1] = -temp[2]
                 self.lines_vp[3*i, :] =   self.points_vp[i0,:]
-                self.lines_vp[3*i+1, :] = temp
+                self.lines_vp[3*i+1, :] = point
+            elif (self.lamb[i0] < 0.0):
+                l10_f = self.points_f[i0,:] - self.points_f[i1,:]
+                lamb_temp = np.dot(cam.P_0-self.points_f[i1,:], cam.n_vp)/np.dot(l10_f, cam.n_vp)
+                point_f = self.points_f[i1,:] + lamb_temp*l10_f -cam.pos
+                temp = np.matmul((cam.R),point_f)
+                point = np.zeros(2)
+                point[0] = temp[1]
+                point[1] = -temp[2]
+                self.lines_vp[3*i, :] =   point
+                self.lines_vp[3*i+1, :] = self.points_vp[i1,:] 
             else:
                 self.lines_vp[3*i, :] =   self.points_vp[i0,:]
                 self.lines_vp[3*i+1, :] = self.points_vp[i1,:]
 
         self.ax.set_data(self.lines_vp[:,0],self.lines_vp[:,1])
 
-        
+
+def on_close(event):
+    global run
+    run = False
+
+def on_move(event):
+    global aileron
+    global elevator
+    if event.inaxes:
+        print(f'data coords {event.xdata}, {event.ydata}')
 
 
 if __name__ == '__main__':
@@ -188,19 +210,6 @@ if __name__ == '__main__':
     print("Done.")
 
 
-    #print(cam.r_c_vp)
-    #print(cam.r_f_vp)
-
-    # Set up ground plane
-
-    points = np.zeros((3,20))
-
-    points[0,:] = [-10.0,10.0,-10.0,10.0,-10.0,10.0,-10.0,10.0,-10.0,10.0,-10.0,-10.0,-5.0,-5.0,0.0,0.0,5.0,5.0,10.0,10.0]
-    points[1,:] = [-10.0,-10.0,-5.0,-5.0,0.0,0.0,5.0,5.0,10.0,10.0,-10.0,10.0,-10.0,10.0,-10.0,10.0,-10.0,10.0,-10.0,10.0]
-    points[2,:] = 0.0
-
-    #print(points)
-
     fig = plt.figure(figsize=(aspect_ratio_vp*5.0, 5.0))
     ax = fig.add_subplot(111)
     plt.subplots_adjust(top=1.0, bottom=0.0, left=0.0, right=1.0)
@@ -214,16 +223,22 @@ if __name__ == '__main__':
     ax.axes.set_aspect('equal')
     fig.canvas.draw() 
     plt.show(block=False)
+
+    # Set up close_event
+    fig.canvas.mpl_connect('close_event', on_close)
+    fig.canvas.mpl_connect('motion_notify_event', on_move)
     
     ground = Grid(input_dict["scene"]["ground"], ax)
 
 
     run = True
 
+    states = np.zeros(7)
+    cnt = 0
+
     while run:
-
-        states = np.zeros(7)
-
+        if cnt == 0:
+            t_i = time.time()
         # Receive states
         states = graphics_conn.recv()
         cam.update(position=states[1:4], euler=np.degrees(states[4:7]))
@@ -232,6 +247,13 @@ if __name__ == '__main__':
 
         fig.canvas.draw()
         fig.canvas.flush_events()
+
+        cnt += 1
+        if cnt == 100:
+            t_o = time.time()
+            fps = 100/(t_o-t_i)
+            print("graphics rate [hz] = ", fps)
+            cnt = 0
 
         #run = False
 

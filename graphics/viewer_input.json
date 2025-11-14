@@ -22,9 +22,9 @@
         "ground" : {
             "type" : "grid",
             "altitude[ft]" : 0.0,
-            "grid_number" : 8,
+            "grid_number" : 20,
             "grid_scale[ft]" : 400.0,
-            "color" : "black"
+            "color" : "skyblue"
         }
     }
 }
