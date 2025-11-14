@@ -72,62 +72,76 @@ class Grid:
 
         self.ax = ax
 
+        # Parse json
         color = dict["color"]
         ground_altitude = dict['altitude[ft]']
         grid_number = dict['grid_number']
         grid_scale = dict['grid_scale[ft]']
 
+        # Initialize grid
         nxlines = grid_number*2 + 1
         self.nlines = 2*nxlines
-        self.points = np.zeros((4*nxlines,3))
-        self.lines = np.zeros((2*nxlines,2), dtype= int)
+        self.points_f = np.zeros((4*nxlines,3))
+        self.lines_f = np.zeros((2*nxlines,2), dtype= int)
+
 
         for i in range(nxlines):
-            self.points[2*i, :] = [-grid_number*grid_scale, (i-grid_number)*grid_scale, -ground_altitude]
-            self.points[2*i+1, :] = [grid_number*grid_scale, (i-grid_number)*grid_scale, -ground_altitude]
-            self.lines[i,0] = 2*i
-            self.lines[i,1] = 2*i+1
+            self.points_f[2*i, :] = [-grid_number*grid_scale, (i-grid_number)*grid_scale, -ground_altitude]
+            self.points_f[2*i+1, :] = [grid_number*grid_scale, (i-grid_number)*grid_scale, -ground_altitude]
+            self.lines_f[i,0] = 2*i
+            self.lines_f[i,1] = 2*i+1
 
         for i in range(nxlines):
-            self.points[2*i+2*nxlines, :] =   [(i-grid_number)*grid_scale, -grid_number*grid_scale, -ground_altitude]
-            self.points[2*i+2*nxlines+1, :] = [(i-grid_number)*grid_scale, grid_number*grid_scale, -ground_altitude]
-            self.lines[i+nxlines,0] = 2*i+2*nxlines
-            self.lines[i+nxlines,1] = 2*i+2*nxlines+1
+            self.points_f[2*i+2*nxlines, :] =   [(i-grid_number)*grid_scale, -grid_number*grid_scale, -ground_altitude]
+            self.points_f[2*i+2*nxlines+1, :] = [(i-grid_number)*grid_scale, grid_number*grid_scale, -ground_altitude]
+            self.lines_f[i+nxlines,0] = 2*i+2*nxlines
+            self.lines_f[i+nxlines,1] = 2*i+2*nxlines+1
 
-        self.npoints = len(self.points)
-        self.nlines = len(self.lines)
+        self.npoints = len(self.points_f)
+        self.nlines = len(self.lines_f)
 
 
         self.ax, = ax.plot([],[],ls='-',color=color)
 
-        self.points2D = np.zeros((self.npoints, 2))
-        self.Ica = np.zeros((self.npoints,3))
-        self.Lam = np.zeros(self.npoints)
-        self.LI_ca = np.zeros((self.npoints,3))
+        self.I_ca = np.zeros((self.npoints,3))
+        self.lamb = np.zeros(self.npoints)
+        self.P_b_c = np.zeros((self.npoints,3))
 
-        self.lines2D = np.full((self.nlines*3,2), None, dtype=object)
+        self.points_vp = np.zeros((self.npoints, 2))
+        self.lines_vp = np.full((self.nlines*3,2), None, dtype=object)
 
     def draw(self, cam):
 
-        self.I_ca = self.points - cam.pos[np.newaxis,:]
+        self.I_ca = self.points_f - cam.pos[np.newaxis,:]
 
         for i in range(self.npoints):
-            self.Lam[i] = np.dot(cam.P_0-cam.pos,cam.n_vp)/np.dot(self.I_ca[i,:],cam.n_vp)
-            self.LI_ca[i,:] = self.Lam[i]*self.I_ca[i,:]
+            self.lamb[i] = np.dot(cam.P_0-cam.pos,cam.n_vp)/np.dot(self.I_ca[i,:],cam.n_vp)
+            self.P_b_c[i,:] = self.lamb[i]*self.I_ca[i,:]
 
-        temp = np.transpose(np.matmul(cam.R, np.transpose(self.LI_ca)))
-        self.points2D[:,0] = temp[:,1]
-        self.points2D[:,1] = -temp[:,2]
+        temp = np.transpose(np.matmul(cam.R, np.transpose(self.P_b_c)))
+        self.points_vp[:,0] = temp[:,1]
+        self.points_vp[:,1] = -temp[:,2]
 
 
         for i in range(self.nlines):
-            i0 = self.lines[i,0]
-            i1 = self.lines[i,1]
+            i0 = self.lines_f[i,0]
+            i1 = self.lines_f[i,1]
             
-            self.lines2D[3*i, :] = self.points2D[i0,:]
-            self.lines2D[3*i+1, :] = self.points2D[i1,:]
+            # both points are behind camera
+            if (self.lamb[i0] < 0.0 and self.lamb[i1] < 0.0):
+                self.lines_vp[3*i,   :] = None
+                self.lines_vp[3*i+1, :] = None
+            # only one behind camera
+            elif (self.lamb[i0] < 0.0):
+                self.lines_vp[3*i, :] =   self.points_vp[i0,:]
+                self.lines_vp[3*i+1, :] = self.points_vp[i1,:]
+            else:
+                self.lines_vp[3*i, :] =   self.points_vp[i0,:]
+                self.lines_vp[3*i+1, :] = self.points_vp[i1,:]
 
-        self.ax.set_data(self.lines2D[:,0],self.lines2D[:,1])
+        self.ax.set_data(self.lines_vp[:,0],self.lines_vp[:,1])
+
+        
 
 
 if __name__ == '__main__':
