@@ -133,8 +133,13 @@ class Grid:
                 self.lines_vp[3*i+1, :] = None
             # only one behind camera
             elif (self.lamb[i0] < 0.0):
-                self.lines_vp[3*i, :] =   self.points_vp[i0,:]
+                temp = self.points_vp[i0,:] - self.lamb[i0]*(self.points_vp[i0,:] - self.points_vp[i1,:])/(self.lamb[i0] - self.lamb[i1])
+                self.lines_vp[3*i, :] =   temp
                 self.lines_vp[3*i+1, :] = self.points_vp[i1,:]
+            elif (self.lamb[i1] < 0.0):
+                temp = self.points_vp[i1,:] - self.lamb[i1]*(self.points_vp[i1,:] - self.points_vp[i0,:])/(self.lamb[i1] - self.lamb[i0])
+                self.lines_vp[3*i, :] =   self.points_vp[i0,:]
+                self.lines_vp[3*i+1, :] = temp
             else:
                 self.lines_vp[3*i, :] =   self.points_vp[i0,:]
                 self.lines_vp[3*i+1, :] = self.points_vp[i1,:]
