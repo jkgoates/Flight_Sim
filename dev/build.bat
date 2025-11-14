@@ -3,4 +3,4 @@
 ::gfortran -fdefault-real-8 -Wall 5.9.1.f90 -o main
 ::gfortran -fdefault-real-8 -O2 -Wall goates.f90 5.9.5.f90 -o main
 ::gfortran -fdefault-real-8 -O2 json.f90 jsonx.f90 goates.f90 5.9.9.f90 -o main
-gfortran -fdefault-real-8 -O2 -Wall json.f90 jsonx.f90 goates.f90 5.9.10.f90 -o main
+gfortran -fdefault-real-8 -O2 -Wall json.f90 jsonx.f90 goates.f90 5.9.10.f90 -o main -lws2-32

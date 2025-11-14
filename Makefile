@@ -9,7 +9,7 @@ COM_DIR = common
 BIN_DIR = bin
 
 # List common files (ordered based on dependency)
-COMMON_FILES = json.f90 jsonx.f90 linalg.f90 micro_time.f90
+COMMON_FILES = json.f90 jsonx.f90 linalg.f90 micro_time.f90 database_m.f90 udp_windows_m.f90 connection_m.f90
 COMMON_PATHS = $(addprefix $(COM_DIR)/, $(COMMON_FILES))
 
 # List source files (ordered based on dependency)
@@ -32,7 +32,7 @@ PROGRAM = sim.exe
 
 # Default make
 default:
-	$(COMPILER) $(FLAGS) -o $(PROGRAM) $(COMMON_PATHS) $(SRC_PATHS) $(MAIN_PATH)
+	$(COMPILER) $(FLAGS) $(COMMON_PATHS) $(SRC_PATHS) $(MAIN_PATH) -o $(PROGRAM)  -lws2_32
 
 # Debug option
 debug:

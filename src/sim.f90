@@ -4,6 +4,7 @@ module simulation_m
     use jsonx_m
     use linalg_mod
     use micro_time_m
+    use connection_m
 
     implicit none
     
@@ -13,6 +14,9 @@ module simulation_m
     real :: controls(4)
     real :: y_init(13)
     type(json_value), pointer :: j_main
+
+    type(connection) :: graphics
+    real :: s(7)
 
     ! NOTES FROM DR. HUNSAKERS CODE
     
@@ -439,13 +443,16 @@ contains
         
         real, intent(inout) :: V_mag, H
 
-        real :: alpha, beta, p, q, r, da, de, dr, throttle, phi, theta, psi
+        real :: alpha, beta, p, q, r, da, de, dr, throttle, phi, theta, psi, xf, yf, zf
         
         call jsonx_get(j_main, "initial.state.alpha[deg]", alpha, default_value=0.0)
         call jsonx_get(j_main, "initial.state.beta[deg]", beta, default_value=0.0)
         call jsonx_get(j_main, "initial.state.p[deg/s]", p, default_value=0.0)
         call jsonx_get(j_main, "initial.state.q[deg/s]", q, default_value=0.0)
         call jsonx_get(j_main, "initial.state.r[deg/s]", r, default_value =0.0)
+        call jsonx_get(j_main, "initial.state.xf[ft]", xf, default_value=0.0)
+        call jsonx_get(j_main, "initial.state.yf[ft]", yf, default_value=0.0)
+        call jsonx_get(j_main, "initial.state.zf[ft]", zf, default_value =0.0)
         call jsonx_get(j_main, "initial.state.aileron[deg]", da, default_value=0.0)
         call jsonx_get(j_main, "initial.state.elevator[deg]", de, default_value=0.0)
         call jsonx_get(j_main, "initial.state.rudder[deg]", dr, default_value=0.0)
@@ -478,6 +485,8 @@ contains
         y_init(5) = q*PI/180.
         y_init(6) = r*PI/180.
 
+        y_init(7) = xf
+        y_init(8) = yf
         y_init(9) = -H
 
         y_init(10:13) = euler_to_quat((/phi, theta, psi/))
@@ -513,6 +522,8 @@ contains
 
         ! Get type of initialization
         call jsonx_get(j_main, "initial.type", init_type)
+
+        call udp_initialize()         ! for windows users
 
         select case(init_type)
         case("state")
@@ -601,10 +612,15 @@ contains
         real :: dt, tf
         logical :: t_R
         real :: t_p, t_c, start_time, end_time
+        type(json_value), pointer :: j_graphics
+        character(:), allocatable :: temp
 
 
         call jsonx_get(j_main, "simulation.timestep[s]", dt, default_value=0.01)
         call jsonx_get(j_main, "simulation.total_time[s]", tf)
+
+        call jsonx_get(j_main, "graphics", j_graphics)
+        call graphics%init(j_graphics, 7)
 
         t = 0.0
         y = y_init
@@ -666,6 +682,12 @@ contains
                             t,',',y(1),',',y(2),',',y(3),',',y(4),',',y(5),',' &
                             ,y(6),',',y(7),',',y(8),',',y(9),',',y(10),',',y(11),',',y(12),',',y(13)
 
+            s(1) = t
+            s(2:4) = y(7:9)
+            s(5:7) = quat_to_euler(y(10:13))
+
+            call graphics%send(s)
+
         end do
         end_time = get_time()
 
@@ -676,6 +698,8 @@ contains
         if (t_R) then
             write(*,*) "Real time simulation error: ", tf - (end_time - start_time), " seconds."
         end if
+
+        call udp_finalize()
 
     end subroutine run 
 
