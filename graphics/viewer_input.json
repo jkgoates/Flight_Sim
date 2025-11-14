@@ -10,6 +10,7 @@
     },
     "connections" : {
         "receive_states" : {
+            "verbose": false,
             "type": "receive",
             "channel_type": "udp",
             "number_of_values": 7,

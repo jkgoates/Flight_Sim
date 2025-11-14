@@ -65,8 +65,6 @@ class Camera:
         self.P_2 = self.r_f_vp[:,0]
         self.n_vp = np.cross(self.P_1-self.P_0, self.P_2-self.P_0)
 
-        print(self.P_0)
-        print(self.n_vp)
 
 
 class Grid:
@@ -187,13 +185,13 @@ if __name__ == '__main__':
     fig = plt.figure(figsize=(aspect_ratio_vp*5.0, 5.0))
     ax = fig.add_subplot(111)
     plt.subplots_adjust(top=1.0, bottom=0.0, left=0.0, right=1.0)
-    #plt.axis('off')
+    plt.axis('off')
     ax.axes.set_xlim( cam.r_c_vp[1,1], cam.r_c_vp[1,2])
     ax.axes.set_ylim( -cam.r_c_vp[2,1], -cam.r_c_vp[2,0])
-    #ax.axes.xaxis.set_ticklabels([])
-    #ax.axes.yaxis.set_ticklabels([])
-    #ax.set_xticks([])
-    #ax.set_yticks([])
+    ax.axes.xaxis.set_ticklabels([])
+    ax.axes.yaxis.set_ticklabels([])
+    ax.set_xticks([])
+    ax.set_yticks([])
     ax.axes.set_aspect('equal')
     fig.canvas.draw() 
     plt.show(block=False)
