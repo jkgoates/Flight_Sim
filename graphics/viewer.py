@@ -7,10 +7,20 @@ import time
 from connection_m import connection
 
 class Camera:
-    def __init__(self, **kwargs):
-        self.d_vp = kwargs['depth']
-        self.theta_vp = kwargs['angle']
-        self.AR = kwargs['aspect_ratio']
+    def __init__(self, dict):
+        self.d_vp = dict['view_plane']['depth[ft]']
+        self.theta_vp = np.radians(dict['view_plane']['angle[deg]'])
+        self.AR = dict['view_plane']['aspect_ratio']
+
+        if 'type' in dict:
+            self.type = dict['type']
+        else:
+            self.type = 'follow'
+
+        if self.type == 'follow':
+            self.distance = dict['follow_distance[ft]']
+
+        
 
     #self.theta_vp = np.radians(self.theta_vp)
         self.w_vp = 2*self.d_vp*np.tan(self.theta_vp)
@@ -30,7 +40,7 @@ class Camera:
 
     
     def update(self, **kwargs):
-        self.pos = np.array(kwargs['position'])
+        self.pos = np.array(kwargs['pos'])
         self.euler = kwargs['euler']
         
         self.R = np.zeros((3,3))
@@ -56,6 +66,9 @@ class Camera:
 
         R_inv = sp.linalg.inv(self.R)
 
+        if self.type == 'follow':
+            self.pos = self.pos + self.distance*np.matmul(R_inv, [1.0, 0.0, 0.0])
+
         self.r_f_vp = np.matmul(R_inv, self.r_c_vp) + self.pos[:,np.newaxis]
 
         self.P_0 = np.zeros(3)
@@ -68,41 +81,90 @@ class Camera:
 
 
 
-class Grid:
+class LinesObject:
     def __init__(self, dict, ax):
 
         self.ax = ax
 
         # Parse json
         color = dict["color"]
-        ground_altitude = dict['altitude[ft]']
-        grid_number = dict['grid_number']
-        grid_scale = dict['grid_scale[ft]']
+        self.clipping = False
 
-        # Initialize grid
-        nxlines = grid_number*2 + 1
-        self.nlines = 2*nxlines
-        self.points_f = np.zeros((4*nxlines,3))
-        self.lines_f = np.zeros((2*nxlines,2), dtype= int)
+        if "type" in dict:
+            self.type = dict["type"]
+        else:
+            self.type = 'vtk'
+
+        if self.type == 'vtk':
+            vtkfile = dict['filename']
+
+            with open(vtkfile, 'r') as reader:
+                content = reader.readlines()
+
+            points = []
+            lines = []
+
+            started_points = False
+            started_lines = False
+
+            for line in content:
+                if 'POINTS' in line:
+                    started_points = True
+                    npoints = int(line.split()[1])
+                    continue
+
+                if 'LINES' in line:
+                    started_lines = True
+                    nlines = int(line.split()[1])
+                    continue
+
+                if started_points and not started_lines:
+                    coords = line.strip().split()
+                    if len(coords) == 3:
+                        points.append([float(coords[0]), float(coords[1]), float(coords[2])])
+
+                if started_lines:
+                    indices = line.strip().split()
+                    if len(indices) == 3 and indices[0] == '2':
+                        lines.append([int(indices[1]), int(indices[2])])
+
+            self.points = np.array(points)
+            self.lines = np.array(lines)
 
 
-        for i in range(nxlines):
-            self.points_f[2*i, :] = [-grid_number*grid_scale, (i-grid_number)*grid_scale, -ground_altitude]
-            self.points_f[2*i+1, :] = [grid_number*grid_scale, (i-grid_number)*grid_scale, -ground_altitude]
-            self.lines_f[i,0] = 2*i
-            self.lines_f[i,1] = 2*i+1
+        if self.type == 'grid':
+            self.clipping = True
+            ground_altitude = dict['altitude[ft]']
+            grid_number = dict['grid_number']
+            grid_scale = dict['grid_scale[ft]']
 
-        for i in range(nxlines):
-            self.points_f[2*i+2*nxlines, :] =   [(i-grid_number)*grid_scale, -grid_number*grid_scale, -ground_altitude]
-            self.points_f[2*i+2*nxlines+1, :] = [(i-grid_number)*grid_scale, grid_number*grid_scale, -ground_altitude]
-            self.lines_f[i+nxlines,0] = 2*i+2*nxlines
-            self.lines_f[i+nxlines,1] = 2*i+2*nxlines+1
+            # Initialize grid
+            nxlines = grid_number*2 + 1
+            self.nlines = 2*nxlines
+            self.points = np.zeros((4*nxlines,3))
+            self.lines = np.zeros((2*nxlines,2), dtype= int)
 
-        self.npoints = len(self.points_f)
-        self.nlines = len(self.lines_f)
 
+            for i in range(nxlines):
+                self.points[2*i, :] = [-grid_number*grid_scale, (i-grid_number)*grid_scale, -ground_altitude]
+                self.points[2*i+1, :] = [grid_number*grid_scale, (i-grid_number)*grid_scale, -ground_altitude]
+                self.lines[i,0] = 2*i
+                self.lines[i,1] = 2*i+1
+
+            for i in range(nxlines):
+                self.points[2*i+2*nxlines, :] =   [(i-grid_number)*grid_scale, -grid_number*grid_scale, -ground_altitude]
+                self.points[2*i+2*nxlines+1, :] = [(i-grid_number)*grid_scale, grid_number*grid_scale, -ground_altitude]
+                self.lines[i+nxlines,0] = 2*i+2*nxlines
+                self.lines[i+nxlines,1] = 2*i+2*nxlines+1
+
+
+        self.npoints = len(self.points)
+        self.nlines = len(self.lines)
 
         self.ax, = ax.plot([],[],ls='-',color=color)
+
+        self.points3D = np.zeros((self.npoints,3))
+        self.update([0.0, 0.0, 0.0], [0.0, 0.0, 0.0])
 
         self.I_ca = np.zeros((self.npoints,3))
         self.lamb = np.zeros(self.npoints)
@@ -111,9 +173,40 @@ class Grid:
         self.points_vp = np.zeros((self.npoints, 2))
         self.lines_vp = np.full((self.nlines*3,2), None, dtype=object)
 
+    def update(self, pos, euler):
+
+        pos = np.array(pos)
+        euler = np.array(euler)
+
+        self.R = np.zeros((3,3))
+
+        c_euler = np.cos(np.radians(euler))
+        s_euler = np.sin(np.radians(euler))
+        c_phi = c_euler[0]
+        c_theta = c_euler[1]
+        c_psi = c_euler[2]
+        s_phi = s_euler[0]
+        s_theta = s_euler[1]
+        s_psi = s_euler[2]
+
+        self.R[0,0] = c_theta*c_psi
+        self.R[0,1] = c_theta*s_psi
+        self.R[0,2] = -s_theta
+        self.R[1,0] = s_phi*s_theta*c_psi - c_phi*s_psi
+        self.R[1,1] = s_phi*s_theta*s_psi + c_phi*c_psi
+        self.R[1,2] = s_phi*c_theta
+        self.R[2,0] = c_phi*s_theta*c_psi + s_phi*s_psi
+        self.R[2,1] = c_phi*s_theta*s_psi - s_phi*c_psi
+        self.R[2,2] = c_phi*c_theta
+
+        R_inv = sp.linalg.inv(self.R)
+
+        self.points3D = np.transpose(np.matmul(R_inv, np.transpose(self.points))) + pos[np.newaxis,:]
+
+
     def draw(self, cam):
 
-        self.I_ca = self.points_f - cam.pos[np.newaxis,:]
+        self.I_ca = self.points3D - cam.pos[np.newaxis,:]
 
         for i in range(self.npoints):
             self.lamb[i] = np.dot(cam.P_0-cam.pos,cam.n_vp)/np.dot(self.I_ca[i,:],cam.n_vp)
@@ -125,18 +218,20 @@ class Grid:
 
 
         for i in range(self.nlines):
-            i0 = self.lines_f[i,0]
-            i1 = self.lines_f[i,1]
+            i0 = self.lines[i,0]
+            i1 = self.lines[i,1]
             
             # both points are behind camera
             if (self.lamb[i0] < 0.0 and self.lamb[i1] < 0.0):
+                if self.type == 'vtk':
+                    print("got here")
                 self.lines_vp[3*i,   :] = None
                 self.lines_vp[3*i+1, :] = None
             # only one behind camera
             elif (self.lamb[i1] < 0.0):
-                l10_f = self.points_f[i1,:] - self.points_f[i0,:]
-                lamb_temp = np.dot(cam.P_0-self.points_f[i0,:], cam.n_vp)/np.dot(l10_f, cam.n_vp)
-                point_f = self.points_f[i0,:] + lamb_temp*l10_f - cam.pos
+                l10_f = self.points3D[i1,:] - self.points3D[i0,:]
+                lamb_temp = np.dot(cam.P_0-self.points3D[i0,:], cam.n_vp)/np.dot(l10_f, cam.n_vp)
+                point_f = self.points3D[i0,:] + lamb_temp*l10_f - cam.pos
                 temp = np.matmul((cam.R),point_f)
                 point = np.zeros(2)
                 point[0] = temp[1]
@@ -144,9 +239,9 @@ class Grid:
                 self.lines_vp[3*i, :] =   self.points_vp[i0,:]
                 self.lines_vp[3*i+1, :] = point
             elif (self.lamb[i0] < 0.0):
-                l10_f = self.points_f[i0,:] - self.points_f[i1,:]
-                lamb_temp = np.dot(cam.P_0-self.points_f[i1,:], cam.n_vp)/np.dot(l10_f, cam.n_vp)
-                point_f = self.points_f[i1,:] + lamb_temp*l10_f -cam.pos
+                l10_f = self.points3D[i0,:] - self.points3D[i1,:]
+                lamb_temp = np.dot(cam.P_0-self.points3D[i1,:], cam.n_vp)/np.dot(l10_f, cam.n_vp)
+                point_f = self.points3D[i1,:] + lamb_temp*l10_f -cam.pos
                 temp = np.matmul((cam.R),point_f)
                 point = np.zeros(2)
                 point[0] = temp[1]
@@ -156,6 +251,7 @@ class Grid:
             else:
                 self.lines_vp[3*i, :] =   self.points_vp[i0,:]
                 self.lines_vp[3*i+1, :] = self.points_vp[i1,:]
+
 
         self.ax.set_data(self.lines_vp[:,0],self.lines_vp[:,1])
 
@@ -190,27 +286,17 @@ if __name__ == '__main__':
 
     cam_input = input_dict["camera"]
 
+    print("Starting graphics...")
+    print("Initializing Camera...")
+    cam = Camera(cam_input)
+    print("Done.")
+    print("Updating position...")
+    cam.update(pos=[0.0, 0.0, -10.0], euler=[0.0, 0.0, 0.0])
+    print("Done.")
 
     graphics_conn = connection(input_dict["connections"]["receive_states"])
 
-
-    d_vp = input_dict['camera']['view_plane']['distance[ft]']
-    aspect_ratio_vp = input_dict['camera']['view_plane']['aspect_ratio']
-    theta_vp = np.deg2rad(input_dict['camera']['view_plane']['angle[deg]'])
-
-    position = input_dict['camera']['location[ft]']
-    euler = input_dict['camera']['orientation[deg]']
-
-    print("Starting graphics...")
-    print("Initializing Camera...")
-    cam = Camera(depth=d_vp, angle=theta_vp, aspect_ratio=aspect_ratio_vp)
-    print("Done.")
-    print("Updating position...")
-    cam.update(position=position, euler=euler)
-    print("Done.")
-
-
-    fig = plt.figure(figsize=(aspect_ratio_vp*5.0, 5.0))
+    fig = plt.figure(figsize=(cam.AR*5.0, 5.0))
     ax = fig.add_subplot(111)
     plt.subplots_adjust(top=1.0, bottom=0.0, left=0.0, right=1.0)
     plt.axis('off')
@@ -228,8 +314,10 @@ if __name__ == '__main__':
     fig.canvas.mpl_connect('close_event', on_close)
     fig.canvas.mpl_connect('motion_notify_event', on_move)
     
-    ground = Grid(input_dict["scene"]["ground"], ax)
+    ground = LinesObject(input_dict["scene"]["ground"], ax)
+    vehicle = LinesObject(input_dict["scene"]["vehicle"], ax)
 
+    vehicle.update([0.0, 0.0, 0.0], [0.0, 0.0, 0.0])
 
     run = True
 
@@ -241,17 +329,19 @@ if __name__ == '__main__':
             t_i = time.time()
         # Receive states
         states = graphics_conn.recv()
-        cam.update(position=states[1:4], euler=np.degrees(states[4:7]))
+        vehicle.update(states[1:4], states[4:7])
+        cam.update(pos=states[1:4], euler=np.degrees(states[4:7]))
 
         ground.draw(cam)
+        vehicle.draw(cam)
 
         fig.canvas.draw()
         fig.canvas.flush_events()
 
         cnt += 1
-        if cnt == 100:
+        if cnt == 50:
             t_o = time.time()
-            fps = 100/(t_o-t_i)
+            fps = 50/(t_o-t_i)
             print("graphics rate [hz] = ", fps)
             cnt = 0
 

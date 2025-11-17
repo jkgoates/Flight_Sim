@@ -1,12 +1,12 @@
 {
     "camera": {
         "view_plane": {
-            "distance[ft]": 1.0,
+            "depth[ft]": 1.0,
             "angle[deg]": 60.0,
             "aspect_ratio": 2
         },
-        "location[ft]": [-20.0, 0.0, -5.0],
-        "orientation[deg]": [5.0, -10.0, 0.0]
+        "type": "follow",
+        "follow_distance[ft]": -40.0
     },
     "connections" : {
         "receive_states" : {
@@ -16,6 +16,14 @@
             "number_of_values": 7,
             "refresh_rate": 60,
             "port_ID": 5005
+        },
+        "send_controls": {
+            "verbose": true,
+            "type": "send",
+            "channel_type": "udp",
+            "number_of_values": 5,
+            "refresh_rate": 100,
+            "port_ID": 5006
         }
     },
     "scene" : {
@@ -25,6 +33,12 @@
             "grid_number" : 20,
             "grid_scale[ft]" : 400.0,
             "color" : "skyblue"
+        },
+        "vehicle": {
+            "type" : "vtk",
+            "filename": "f16_coarse.vtk",
+            "color": "black"
         }
+
     }
 }
