@@ -67,7 +67,7 @@ class Camera:
         R_inv = sp.linalg.inv(self.R)
 
         if self.type == 'follow':
-            self.pos = self.pos + self.distance*np.matmul(R_inv, [1.0, 0.0, 0.0])
+            self.pos = self.pos + np.matmul(R_inv, self.distance)
 
         self.r_f_vp = np.matmul(R_inv, self.r_c_vp) + self.pos[:,np.newaxis]
 
@@ -223,8 +223,6 @@ class LinesObject:
             
             # both points are behind camera
             if (self.lamb[i0] < 0.0 and self.lamb[i1] < 0.0):
-                if self.type == 'vtk':
-                    print("got here")
                 self.lines_vp[3*i,   :] = None
                 self.lines_vp[3*i+1, :] = None
             # only one behind camera
@@ -248,6 +246,7 @@ class LinesObject:
                 point[1] = -temp[2]
                 self.lines_vp[3*i, :] =   point
                 self.lines_vp[3*i+1, :] = self.points_vp[i1,:] 
+            # Both points in front
             else:
                 self.lines_vp[3*i, :] =   self.points_vp[i0,:]
                 self.lines_vp[3*i+1, :] = self.points_vp[i1,:]
@@ -256,6 +255,7 @@ class LinesObject:
         self.ax.set_data(self.lines_vp[:,0],self.lines_vp[:,1])
 
 
+# MATPLOTLIB Events
 def on_close(event):
     global run
     run = False
@@ -265,6 +265,20 @@ def on_move(event):
     global elevator
     if event.inaxes:
         print(f'data coords {event.xdata}, {event.ydata}')
+
+def on_keypress(event):
+    global throttle
+    if (event.key == 'pageup'):
+        throttle += 0.01
+    elif (event.key == 'pagedown'):
+        throttle -= 0.01
+
+    if throttle > 1.0 : 
+        throttle = 1.0
+    elif throttle < 0.0:
+        throttle = 0.0
+
+    print('throttle adjusted to: ', throttle)
 
 
 if __name__ == '__main__':
@@ -291,10 +305,11 @@ if __name__ == '__main__':
     cam = Camera(cam_input)
     print("Done.")
     print("Updating position...")
-    cam.update(pos=[0.0, 0.0, -10.0], euler=[0.0, 0.0, 0.0])
+    cam.update(pos=[0.0, 0.0, 0.0], euler=[0.0, 0.0, 0.0])
     print("Done.")
 
     graphics_conn = connection(input_dict["connections"]["receive_states"])
+    controls_conn = connection(input_dict["connections"]["send_controls"])
 
     fig = plt.figure(figsize=(cam.AR*5.0, 5.0))
     ax = fig.add_subplot(111)
@@ -310,9 +325,10 @@ if __name__ == '__main__':
     fig.canvas.draw() 
     plt.show(block=False)
 
-    # Set up close_event
+    # Set up matplotlib events 
     fig.canvas.mpl_connect('close_event', on_close)
     fig.canvas.mpl_connect('motion_notify_event', on_move)
+    fig.canvas.mpl_connect('key_press_event', on_keypress)
     
     ground = LinesObject(input_dict["scene"]["ground"], ax)
     vehicle = LinesObject(input_dict["scene"]["vehicle"], ax)
@@ -323,20 +339,30 @@ if __name__ == '__main__':
 
     states = np.zeros(7)
     cnt = 0
+    vehicle.draw(cam)
+
+    # Initialize controls
+    controls = np.zeros(4)
+    aileron = 0.0
+    rudder = 0.0
+    elevator = 0.0
+    throttle = 0.0
+    
 
     while run:
         if cnt == 0:
             t_i = time.time()
         # Receive states
         states = graphics_conn.recv()
-        vehicle.update(states[1:4], states[4:7])
+        vehicle.update(states[1:4], np.degrees(states[4:7]))
         cam.update(pos=states[1:4], euler=np.degrees(states[4:7]))
 
         ground.draw(cam)
-        vehicle.draw(cam)
 
         fig.canvas.draw()
         fig.canvas.flush_events()
+
+        controls = [aileron, rudder, elevator, throttle]
 
         cnt += 1
         if cnt == 50:
@@ -345,7 +371,6 @@ if __name__ == '__main__':
             print("graphics rate [hz] = ", fps)
             cnt = 0
 
-        #run = False
 
 
 

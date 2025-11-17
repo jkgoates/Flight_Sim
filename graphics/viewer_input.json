@@ -6,7 +6,7 @@
             "aspect_ratio": 2
         },
         "type": "follow",
-        "follow_distance[ft]": -40.0
+        "follow_distance[ft]": [-40.0, 0.0, -10.0]
     },
     "connections" : {
         "receive_states" : {
