@@ -255,6 +255,17 @@ class LinesObject:
         self.ax.set_data(self.lines_vp[:,0],self.lines_vp[:,1])
 
 
+class HUD:
+    def __init__(self,json_data,ax,camera):
+        color = json_data["color"]
+        box_background_color = 'lightgrey'
+        dx = camera.dx
+        dy = camera.dy
+
+        # Altitude
+        self.altitude_minor = TickerTape(ax,color,'vertical',0.4*dy, 10, 100, 0.4*dx, -0.02*dx)
+
+
 # MATPLOTLIB Events
 def on_close(event):
     global run
@@ -263,15 +274,18 @@ def on_close(event):
 def on_move(event):
     global aileron
     global elevator
-    if event.inaxes:
-        print(f'data coords {event.xdata}, {event.ydata}')
+    #if event.inaxes:
+        #print(f'data coords {event.xdata}, {event.ydata}')
+
+    aileron = -np.radians(30*event.xdata/1.7)
+    elevator = np.radians(30*event.ydata/0.85)
 
 def on_keypress(event):
     global throttle
     if (event.key == 'pageup'):
-        throttle += 0.01
+        throttle += 0.02
     elif (event.key == 'pagedown'):
-        throttle -= 0.01
+        throttle -= 0.02
 
     if throttle > 1.0 : 
         throttle = 1.0
@@ -346,7 +360,7 @@ if __name__ == '__main__':
     aileron = 0.0
     rudder = 0.0
     elevator = 0.0
-    throttle = 0.0
+    throttle = 0.5
     
 
     while run:
@@ -362,13 +376,15 @@ if __name__ == '__main__':
         fig.canvas.draw()
         fig.canvas.flush_events()
 
-        controls = [aileron, rudder, elevator, throttle]
+        controls = [aileron, elevator, rudder, throttle]
+        controls_conn.send(controls)
 
         cnt += 1
         if cnt == 50:
             t_o = time.time()
             fps = 50/(t_o-t_i)
             print("graphics rate [hz] = ", fps)
+            #print('controls:', controls)
             cnt = 0
 
 

@@ -2,7 +2,7 @@
     "simulation": {
         "verbose": false,
         "timestep[s]": 0.00,
-        "total_time[s]" : 60.0
+        "total_time[s]" : 120.0
     },
     "vehicle": {
         "mass": {
@@ -113,5 +113,12 @@
         "number_of_values": 7,
         "refresh_rate": 60,
         "port_ID": 5005
+    },
+    "controls":{
+        "type": "receive",
+        "channel_type": "udp",
+        "number_of_values": 4,
+        "refresh_rate": 30,
+        "port_ID": 5006
     }
 }

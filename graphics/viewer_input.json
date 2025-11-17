@@ -18,11 +18,11 @@
             "port_ID": 5005
         },
         "send_controls": {
-            "verbose": true,
+            "verbose": false,
             "type": "send",
             "channel_type": "udp",
-            "number_of_values": 5,
-            "refresh_rate": 100,
+            "number_of_values": 4,
+            "refresh_rate": 30,
             "port_ID": 5006
         }
     },

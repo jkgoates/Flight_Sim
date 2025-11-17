@@ -15,7 +15,7 @@ module simulation_m
     real :: y_init(13)
     type(json_value), pointer :: j_main
 
-    type(connection) :: graphics
+    type(connection) :: graphics, controls_conn
     real :: s(7)
 
     ! NOTES FROM DR. HUNSAKERS CODE
@@ -612,7 +612,7 @@ contains
         real :: dt, tf
         logical :: t_R
         real :: t_p, t_c, start_time, end_time
-        type(json_value), pointer :: j_graphics
+        type(json_value), pointer :: j_graphics, j_controls
         character(:), allocatable :: temp
 
 
@@ -621,6 +621,9 @@ contains
 
         call jsonx_get(j_main, "graphics", j_graphics)
         call graphics%init(j_graphics, 7)
+
+        call jsonx_get(j_main, "controls", j_controls)
+        call controls_conn%init(j_controls, 4)
 
         t = 0.0
         y = y_init
@@ -687,6 +690,7 @@ contains
             s(5:7) = quat_to_euler(y(10:13))
 
             call graphics%send(s)
+            controls = controls_conn%recv()
 
         end do
         end_time = get_time()
