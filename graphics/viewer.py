@@ -282,6 +282,7 @@ def on_move(event):
 
 def on_keypress(event):
     global throttle
+    print('you_pressed', event.key)
     if (event.key == 'pageup'):
         throttle += 0.02
     elif (event.key == 'pagedown'):

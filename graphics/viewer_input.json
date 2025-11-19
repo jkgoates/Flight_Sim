@@ -6,7 +6,7 @@
             "aspect_ratio": 2
         },
         "type": "follow",
-        "follow_distance[ft]": [-40.0, 0.0, -10.0]
+        "follow_distance[ft]": [-40.0, 0.0, -5.0]
     },
     "connections" : {
         "receive_states" : {
@@ -30,7 +30,7 @@
         "ground" : {
             "type" : "grid",
             "altitude[ft]" : 0.0,
-            "grid_number" : 20,
+            "grid_number" : 40,
             "grid_scale[ft]" : 400.0,
             "color" : "skyblue"
         },
