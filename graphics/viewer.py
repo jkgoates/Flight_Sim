@@ -42,11 +42,12 @@ class Camera:
     def update(self, **kwargs):
         self.pos = np.array(kwargs['pos'])
         self.euler = kwargs['euler']
+        self.vel = np.array(kwargs['vel'])
         
         self.R = np.zeros((3,3))
 
-        c_euler = np.cos(np.radians(self.euler))
-        s_euler = np.sin(np.radians(self.euler))
+        c_euler = np.cos((self.euler))
+        s_euler = np.sin((self.euler))
         c_phi = c_euler[0]
         c_theta = c_euler[1]
         c_psi = c_euler[2]
@@ -67,7 +68,7 @@ class Camera:
         R_inv = sp.linalg.inv(self.R)
 
         if self.type == 'follow':
-            self.pos = self.pos + np.matmul(R_inv, self.distance)
+            self.pos = self.pos + self.distance*np.matmul(R_inv, self.vel/np.linalg.norm(self.vel))
 
         self.r_f_vp = np.matmul(R_inv, self.r_c_vp) + self.pos[:,np.newaxis]
 
@@ -180,8 +181,8 @@ class LinesObject:
 
         self.R = np.zeros((3,3))
 
-        c_euler = np.cos(np.radians(euler))
-        s_euler = np.sin(np.radians(euler))
+        c_euler = np.cos((euler))
+        s_euler = np.sin((euler))
         c_phi = c_euler[0]
         c_theta = c_euler[1]
         c_psi = c_euler[2]
@@ -351,7 +352,7 @@ if __name__ == '__main__':
     cam = Camera(cam_input)
     print("Done.")
     print("Updating position...")
-    cam.update(pos=[0.0, 0.0, 0.0], euler=[0.0, 0.0, 0.0])
+    cam.update(pos=[0.0, 0.0, 0.0], euler=[0.0, 0.0, 0.0], vel=[1.0, 0.0, 0.0])
     print("Done.")
 
     graphics_conn = connection(input_dict["connections"]["receive_states"])
@@ -383,9 +384,8 @@ if __name__ == '__main__':
 
     run = True
 
-    states = np.zeros(7)
+    states = np.zeros(13)
     cnt = 0
-    vehicle.draw(cam)
 
     # Initialize controls
     controls = np.zeros(4)
@@ -400,10 +400,11 @@ if __name__ == '__main__':
             t_i = time.time()
         # Receive states
         states = graphics_conn.recv()
-        vehicle.update(states[1:4], np.degrees(states[4:7]))
-        cam.update(pos=states[1:4], euler=np.degrees(states[4:7]))
+        vehicle.update(states[7:10], states[10:13])
+        cam.update(pos=states[7:10], euler=states[10:13], vel=states[1:4])
 
         ground.draw(cam)
+        vehicle.draw(cam)
 
         fig.canvas.draw()
         fig.canvas.flush_events()

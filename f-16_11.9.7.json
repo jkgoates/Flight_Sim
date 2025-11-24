@@ -110,7 +110,7 @@
     "graphics": {
         "type": "send",
         "channel_type": "udp",
-        "number_of_values": 7,
+        "number_of_values": 13,
         "refresh_rate": 60,
         "port_ID": 5005
     },

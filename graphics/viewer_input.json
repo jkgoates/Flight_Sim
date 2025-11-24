@@ -6,14 +6,14 @@
             "aspect_ratio": 2
         },
         "type": "follow",
-        "follow_distance[ft]": [-40.0, 0.0, -5.0]
+        "follow_distance[ft]": -40.0
     },
     "connections" : {
         "receive_states" : {
             "verbose": false,
             "type": "receive",
             "channel_type": "udp",
-            "number_of_values": 7,
+            "number_of_values": 13,
             "refresh_rate": 60,
             "port_ID": 5005
         },

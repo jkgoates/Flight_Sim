@@ -16,7 +16,7 @@ module simulation_m
     type(json_value), pointer :: j_main
 
     type(connection) :: graphics, controls_conn
-    real :: s(7)
+    real :: s(13)
 
     ! NOTES FROM DR. HUNSAKERS CODE
     
@@ -494,10 +494,7 @@ contains
     end subroutine init_state
 
 
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !!!! FOR USE WITH CHAPTER 6 EXAMPLES !!!!
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine init_6(filename)
+    subroutine init(filename)
 
         implicit none
         
@@ -535,73 +532,73 @@ contains
             stop
         end select
         
-    end subroutine init_6
+    end subroutine init
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !!!! FOR USE WITH CHAPTER 5 EXAMPLES !!!!
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    subroutine init_5(filename)
+    !subroutine init_5(filename)
 
-        implicit none
+        !implicit none
         
-        character(len=100), intent(in) :: filename
-        type(json_value), pointer :: j_aircraft
-        real :: V, H, theta, phi, psi
-        real :: alpha, beta, p, q, r
-        real :: da, de, dr, throttle
+        !character(len=100), intent(in) :: filename
+        !type(json_value), pointer :: j_aircraft
+        !real :: V, H, theta, phi, psi
+        !real :: alpha, beta, p, q, r
+        !real :: da, de, dr, throttle
 
-        ! Load JSON file
-        call jsonx_load(filename, j_main)
+        !! Load JSON file
+        !call jsonx_load(filename, j_main)
 
-        ! Initialize vehicle
-        call jsonx_get(j_main, "vehicle", j_aircraft)
-        call vehicle%init(j_aircraft)
+        !! Initialize vehicle
+        !call jsonx_get(j_main, "vehicle", j_aircraft)
+        !call vehicle%init(j_aircraft)
 
-        call jsonx_get(j_main, "simulation.verbose", verbose, default_value=.false.)
-        call jsonx_get(j_main, "initial.airspeed[ft/s]", V)
-        call jsonx_get(j_main, "initial.altitude[ft]", H)
-        call jsonx_get(j_main, "initial.elevation_angle[deg]", theta, default_value=0.0)
-        call jsonx_get(j_main, "initial.bank_angle[deg]", phi, default_value=0.0)
-        call jsonx_get(j_main, "initial.heading_angle[deg]", psi, default_value=0.0)
-        call jsonx_get(j_main, "initial.alpha[deg]", alpha, default_value=0.0)
-        call jsonx_get(j_main, "initial.beta[deg]", beta, default_value=0.0)
-        call jsonx_get(j_main, "initial.p[deg/s]", p, default_value=0.0)
-        call jsonx_get(j_main, "initial.q[deg/s]", q, default_value=0.0)
-        call jsonx_get(j_main, "initial.r[deg/s]", r, default_value =0.0)
-        call jsonx_get(j_main, "initial.aileron[deg]", da, default_value=0.0)
-        call jsonx_get(j_main, "initial.elevator[deg]", de, default_value=0.0)
-        call jsonx_get(j_main, "initial.rudder[deg]", dr, default_value=0.0)
-        call jsonx_get(j_main, "initial.throttle", throttle, default_value=0.0)
+        !call jsonx_get(j_main, "simulation.verbose", verbose, default_value=.false.)
+        !call jsonx_get(j_main, "initial.airspeed[ft/s]", V)
+        !call jsonx_get(j_main, "initial.altitude[ft]", H)
+        !call jsonx_get(j_main, "initial.elevation_angle[deg]", theta, default_value=0.0)
+        !call jsonx_get(j_main, "initial.bank_angle[deg]", phi, default_value=0.0)
+        !call jsonx_get(j_main, "initial.heading_angle[deg]", psi, default_value=0.0)
+        !call jsonx_get(j_main, "initial.alpha[deg]", alpha, default_value=0.0)
+        !call jsonx_get(j_main, "initial.beta[deg]", beta, default_value=0.0)
+        !call jsonx_get(j_main, "initial.p[deg/s]", p, default_value=0.0)
+        !call jsonx_get(j_main, "initial.q[deg/s]", q, default_value=0.0)
+        !call jsonx_get(j_main, "initial.r[deg/s]", r, default_value =0.0)
+        !call jsonx_get(j_main, "initial.aileron[deg]", da, default_value=0.0)
+        !call jsonx_get(j_main, "initial.elevator[deg]", de, default_value=0.0)
+        !call jsonx_get(j_main, "initial.rudder[deg]", dr, default_value=0.0)
+        !call jsonx_get(j_main, "initial.throttle", throttle, default_value=0.0)
 
-        controls(1) = da*PI/180.
-        controls(2) = de*PI/180.
-        controls(3) = dr*PI/180.
-        controls(4) = throttle
+        !controls(1) = da*PI/180.
+        !controls(2) = de*PI/180.
+        !controls(3) = dr*PI/180.
+        !controls(4) = throttle
 
-        ! Set initial conditions
-        phi   = phi   *PI/180.
-        theta = theta *PI/180.
-        psi   = psi   *PI/180.
+        !! Set initial conditions
+        !phi   = phi   *PI/180.
+        !theta = theta *PI/180.
+        !psi   = psi   *PI/180.
         
-        alpha = alpha *PI/180.
-        beta  = beta  *PI/180.
+        !alpha = alpha *PI/180.
+        !beta  = beta  *PI/180.
 
-        y_init = 0.0
+        !y_init = 0.0
 
-        y_init = V*cos(alpha)*cos(beta)
-        y_init(2) = V*sin(beta)
-        y_init(3) = V*sin(alpha)*cos(beta)
+        !y_init = V*cos(alpha)*cos(beta)
+        !y_init(2) = V*sin(beta)
+        !y_init(3) = V*sin(alpha)*cos(beta)
 
 
-        y_init(4) = p*PI/180.
-        y_init(5) = q*PI/180.
-        y_init(6) = r*PI/180.
+        !y_init(4) = p*PI/180.
+        !y_init(5) = q*PI/180.
+        !y_init(6) = r*PI/180.
 
-        y_init(9) = -H
+        !y_init(9) = -H
 
-        y_init(10:13) = euler_to_quat([phi, theta, psi])
+        !y_init(10:13) = euler_to_quat([phi, theta, psi])
 
-    end subroutine init_5
+    !end subroutine init_5
 
     subroutine run()
 
@@ -620,7 +617,7 @@ contains
         call jsonx_get(j_main, "simulation.total_time[s]", tf)
 
         call jsonx_get(j_main, "graphics", j_graphics)
-        call graphics%init(j_graphics, 7)
+        call graphics%init(j_graphics, 13)
 
         call jsonx_get(j_main, "controls", j_controls)
         call controls_conn%init(j_controls, 4)
@@ -686,8 +683,8 @@ contains
                             ,y(6),',',y(7),',',y(8),',',y(9),',',y(10),',',y(11),',',y(12),',',y(13)
 
             s(1) = t
-            s(2:4) = y(7:9)
-            s(5:7) = quat_to_euler(y(10:13))
+            s(2:10) = y(1:9)
+            s(11:13) = quat_to_euler(y(10:13))
 
             call graphics%send(s)
             controls = controls_conn%recv()

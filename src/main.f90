@@ -8,7 +8,7 @@ program main
     ! Get input file from command line
     call get_command_argument(1, input_file)
 
-    call init_6(input_file)
+    call init(input_file)
 
     call run()
 
