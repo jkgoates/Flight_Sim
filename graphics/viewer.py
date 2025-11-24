@@ -254,6 +254,14 @@ class LinesObject:
 
         self.ax.set_data(self.lines_vp[:,0],self.lines_vp[:,1])
 
+class TickerTape:
+    def _init_(self, ax, color, orientation, lim, num, step, pos, width):
+        
+        pass
+
+    def update(self, val):
+        pass
+
 
 class HUD:
     def __init__(self,json_data,ax,camera):
@@ -264,6 +272,30 @@ class HUD:
 
         # Altitude
         self.altitude_minor = TickerTape(ax,color,'vertical',0.4*dy, 10, 100, 0.4*dx, -0.02*dx)
+        self.altitude_major = TickerTape(ax,color,'vertical',0.4*dy,1,1000,0.4*dx, -0.05*dx, True, 0.01*dx - 0.02*dy)
+        ax.fill([0.4*dx, 0.42*dx, 0.5*dx, 0.5*dx, 0.42*dx, 0.4*dx],[0.0, 0.05*dy, 0.05*dy, -0.05*dy, -0.05*dy, 0.0], facecolor=box_background_color, edgecolor = color, linewidth=1, zorder=100)
+        self.altitude_box = ax.text(0.415*dx, -0.02*dy, str("{:0.0f}".format(0.0)), color=color, zorder=101)
+        
+        # Heading
+        self.heading_minor = TickerTape(ax, color, 'horizontal', 0.2*dx, 4,5,-0.48*dy, 0.02*dy)
+        self.heading_major = TickerTape(ax, color, 'horizontal', 0.2*dx, 2, 10, -0.48*dy, 0.05*dy, True, -0.03*dx, -0.03*dy)
+        ax.fill([0.0, -0.04*dx, -0.04*dx, 0.04*dx, 0.04*dx, 0.0],[-0.48*dy, -0.5*dy, -0.57*dy, -0.57*dy, -0.5*dy, -0.48*dy], facecolor=box_background_color, edgecolor=color, linewidth=1, zorder=100)
+        self.heading_box = ax.text(-0.04*dx, -0.55*dy, str("{:0.0f}".format(0.0)), color=color, zorder=101)
+
+    def draw(self, camera, state):
+        dx = camera.dx
+        dy = camera.dy
+
+        # altitude ticker
+        self.altitude_minor.update(-state.location[2])
+        self.altitude_major.update(-state.location[2])
+        self.altitude_box.set_text(str("{:0.0f}".format(-state.location[2])))
+
+        # heading ticker
+        self.heading_minor.update(state.euler[2]*180.0/np.pi)
+        self.heading_major.update(state.euler[2]*180.0/np.pi)
+        self.heading_box.set_text(str("{:0.0f}".format(state.euler[2]*180.0/np.pi)))
+
 
 
 # MATPLOTLIB Events
@@ -282,7 +314,6 @@ def on_move(event):
 
 def on_keypress(event):
     global throttle
-    print('you_pressed', event.key)
     if (event.key == 'pageup'):
         throttle += 0.02
     elif (event.key == 'pagedown'):
