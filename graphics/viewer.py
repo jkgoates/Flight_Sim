@@ -257,7 +257,28 @@ class LinesObject:
 
 class TickerTape:
     def _init_(self, ax, color, orientation, lim, num, step, pos, width):
-        
+
+        self.color = color
+
+        if orientation == 'vertical':
+            pass
+        elif orientation == 'horizontal':
+            pass
+
+        self.nPoints = num*2
+        self.nLines = num
+        self.points = np.zeros((self.nPoints,2))
+        self.lines = np.zeros((self.nLines,2), dtype=int)
+
+        self.points[:self.nLines,0] = np.linspace(-lim, lim, num)
+        self.points[self.nLines:,0] = np.linspace(-lim, lim, num)
+        self.points[:self.nLines,1] = pos - width/2.0
+        self.points[self.nLines:,1] = pos + width/2.0
+
+
+
+        self.ax, = ax.plot([],[],ls='-',color=color)
+
         pass
 
     def update(self, val):
