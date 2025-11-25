@@ -25,19 +25,27 @@
         "landing_gear": {
             "back_right":{
                 "location[ft]" : [-4.0,3.0,5.0],
-                "spring_constant[lb/ft]": 10000,
-                "damping_constant[lb-s/ft]": 1000
+                "spring_constant[lb/ft]": 20000,
+                "damping_constant[lb-s/ft]": 2000
             },
             "back_left":{
                 "location[ft]" : [-4.0,-3.0,5.0],
-                "spring_constant[lb/ft]": 10000,
-                "damping_constant[lb-s/ft]": 1000
+                "spring_constant[lb/ft]": 20000,
+                "damping_constant[lb-s/ft]": 2000
             },
             "front":{
                 "location[ft]" : [8.0,0.0,5.0],
                 "spring_constant[lb/ft]": 20000,
                 "damping_constant[lb-s/ft]": 2000
             }
+        },
+        "collision_points":{
+            "nose[ft]": [23.0,0.0,0.0],
+            "left_wing[ft]": [-5.0, -15.0, 0.0],
+            "right_wing[ft]": [-5.0, 15.0, 0.0],
+            "rudder[ft]" : [-20.0, 0.0, -10.0],
+            "left_fin[ft]": [-18.0, -8.5, 0.0],
+            "right_fin[ft]": [-18.0, 8.5, 0.0]
         },
         "aerodynamics": {
             "reference" : {
@@ -102,8 +110,8 @@
         }
     },
     "initial": {
-        "airspeed[ft/s]": 5.0,
-        "altitude[ft]": 5.0,
+        "airspeed[ft/s]": 300.0,
+        "altitude[ft]": 500.0,
         "type": "state",
         "state": {
             "alpha[deg]": 0.0,

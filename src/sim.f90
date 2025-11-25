@@ -607,7 +607,7 @@ contains
         real :: t, y(13), y_temp(13)
         integer :: io_unit
         real :: dt, tf
-        logical :: t_R
+        logical :: t_R, crashed
         real :: t_p, t_c, start_time, end_time
         type(json_value), pointer :: j_graphics, j_controls
         character(:), allocatable :: temp
@@ -685,6 +685,9 @@ contains
             s(1) = t
             s(2:10) = y(1:9)
             s(11:13) = quat_to_euler(y(10:13))
+
+            crashed = vehicle%check_collision(t, y)
+            if (crashed) exit
 
             call graphics%send(s)
             controls = controls_conn%recv()

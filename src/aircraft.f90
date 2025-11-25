@@ -23,6 +23,7 @@ module aircraft_m
 
         real, allocatable :: ks(:), kd(:) ! Landing gear spring and damping coefficients
         real, allocatable :: g_b(:,:) ! Landing gear body fixed coordinates
+        real, allocatable :: collision_points(:,:) ! Aircraft collision points
     
     
     contains
@@ -33,6 +34,7 @@ module aircraft_m
         procedure :: thrust         => aircraft_thrust
         procedure :: init           => aircraft_init
         procedure :: landing_gear   => aircraft_landing_gear
+        procedure :: check_collision => aircraft_check_collision
         
     
     end type aircraft
@@ -150,6 +152,25 @@ contains
             this%g_b(cnt, :) = dummy_loc
             call jsonx_get(p2, "spring_constant[lb/ft]", this%ks(cnt))
             call jsonx_get(p2, "damping_constant[lb-s/ft]", this%kd(cnt))
+            cnt = cnt+1
+        end do
+
+        ! Collision points
+        call jsonx_get(settings, "collision_points", p1)
+        N = json_value_count(p1)
+        cnt = 0
+        do i = 1, N
+            call json_value_get(p1, i, p2)
+            if (p2%name(1:1) == 'x') cycle
+            cnt = cnt+1
+        end do
+        allocate(this%collision_points(cnt,3))
+        cnt = 1
+        do i = 1, N
+            call json_value_get(p1, i, p2)
+            if (p2%name(1:1) == 'x') cycle
+            call jsonx_get(p1, p2%name, dummy_loc, 0.0, 3)
+            this%collision_points(cnt, :) = dummy_loc
             cnt = cnt+1
         end do
 
@@ -275,6 +296,31 @@ contains
 
     end subroutine aircraft_landing_gear
 
+
+    function aircraft_check_collision(this, t, y) result(crashed)
+        implicit none
+        
+        class(aircraft), intent(in) :: this
+        real, intent(in) :: t, y(13)
+
+        logical :: crashed
+
+        integer :: N, i
+        real, allocatable :: r_f(:,:)
+
+        N = size(this%collision_points, 1)
+        allocate(r_f(N,3))
+
+        crashed = .false.
+
+        do i = 1, N
+            r_f(i,:) = quat_dependent_to_base(this%collision_points(i,:), y(10:13)) + y(7:9)
+            if (r_f(i,3) > 0.0) then
+                crashed = .true.
+                exit
+            end if
+        end do
+    end function aircraft_check_collision
 
     subroutine aircraft_aerodynamics(this, t, y, F, M, controls)
 
