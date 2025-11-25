@@ -22,6 +22,23 @@
             "T0[lbf]": 29550,
             "a" : 0.84
         },
+        "landing_gear": {
+            "back_right":{
+                "location[ft]" : [-4.0,3.0,5.0],
+                "spring_constant[lb/ft]": 10000,
+                "damping_constant[lb-s/ft]": 1000
+            },
+            "back_left":{
+                "location[ft]" : [-4.0,-3.0,5.0],
+                "spring_constant[lb/ft]": 10000,
+                "damping_constant[lb-s/ft]": 1000
+            },
+            "front":{
+                "location[ft]" : [8.0,0.0,5.0],
+                "spring_constant[lb/ft]": 20000,
+                "damping_constant[lb-s/ft]": 2000
+            }
+        },
         "aerodynamics": {
             "reference" : {
                 "area[ft^2]": 300.0,
@@ -85,20 +102,18 @@
         }
     },
     "initial": {
-        "airspeed[ft/s]": 350.0,
-        "altitude[ft]": 3000.0,
-        "type": "trim",
+        "airspeed[ft/s]": 5.0,
+        "altitude[ft]": 5.0,
+        "type": "state",
         "state": {
-            "xf[ft]" : -7000.0,
-            "alpha[deg]": 8,
-            "elevator[deg]": -8,
-            "phi[deg]": 0.0,
-            "throttle": 0.1
+            "alpha[deg]": 0.0,
+            "elevator[deg]": 0.0,
+            "phi[deg]": 0.0
         },
         "trim": {
             "type": "sct",
-            "bank_angle[deg]": 50.0,
-            "climb_angle[deg]": 0.0,
+            "bank_angle[deg]": 0.0,
+            "climb_angle[deg]": -2.0,
             "solver": {
                 "finite_difference_step_size": 0.01,
                 "relaxation_factor": 0.9,

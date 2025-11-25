@@ -20,6 +20,9 @@ module aircraft_m
         real :: Cm_0, Cm_alpha, Cm_qbar, Cm_alphahat, Cm_de ! Pitching moment coefficients
         real :: Cn_beta, Cn_pbar, Cn_alpha_pbar, Cn_rbar, Cn_da, Cn_alpha_da, Cn_dr ! Yawing moment coefficients
         ! real :: rho0
+
+        real, allocatable :: ks(:), kd(:) ! Landing gear spring and damping coefficients
+        real, allocatable :: g_b(:,:) ! Landing gear body fixed coordinates
     
     
     contains
@@ -29,6 +32,7 @@ module aircraft_m
         procedure :: gyroscopic     => aircraft_gyroscopic
         procedure :: thrust         => aircraft_thrust
         procedure :: init           => aircraft_init
+        procedure :: landing_gear   => aircraft_landing_gear
         
     
     end type aircraft
@@ -40,7 +44,9 @@ contains
         class(aircraft), intent(inout) :: this
         type(json_value), pointer, intent(in) :: settings
 
-        type(json_value), pointer :: reference, coefficients, aerodynamics
+        type(json_value), pointer :: reference, coefficients, aerodynamics, p1, p2
+        real, allocatable :: dummy_loc(:)
+        integer :: N, cnt, i
         logical :: found
 
         ! Parse JSON settings
@@ -124,6 +130,28 @@ contains
         call jsonx_get(coefficients, "Cn.alpha_aileron", this%Cn_alpha_da)
         call jsonx_get(coefficients, "Cn.rudder", this%Cn_dr)
 
+        ! Landing Gear
+        call jsonx_get(settings, "landing_gear", p1)
+        N = json_value_count(p1)
+        cnt= 0
+        do i = 1, N
+            call json_value_get(p1, i, p2)
+            if (p2%name(1:1) == 'x') cycle
+            cnt = cnt+1
+        end do
+        allocate(this%ks(cnt))
+        allocate(this%kd(cnt))
+        allocate(this%g_b(cnt, 3))
+        cnt = 1
+        do i = 1, N
+            call json_value_get(p1, i, p2)
+            if (p2%name(1:1) == 'x') cycle
+            call jsonx_get(p2, "location[ft]", dummy_loc, 0.0, 3)
+            this%g_b(cnt, :) = dummy_loc
+            call jsonx_get(p2, "spring_constant[lb/ft]", this%ks(cnt))
+            call jsonx_get(p2, "damping_constant[lb-s/ft]", this%kd(cnt))
+            cnt = cnt+1
+        end do
 
 
     end subroutine aircraft_init
@@ -200,6 +228,54 @@ contains
 
     end function aircraft_thrust
 
+    subroutine aircraft_landing_gear(this, t, y, F, M)
+
+        implicit none
+        
+        class(aircraft), intent(in) :: this
+        real, intent(in) :: t, y(13)
+        real, intent(out) :: F(3), M(3)
+
+        integer :: N, i
+        real :: dummy_F(3)
+        real, allocatable :: g_f(:,:), v_b(:,:), v_f(:,:)
+
+        N = size(this%ks)
+
+        allocate(g_f(N, 3))
+        allocate(v_f(N, 3))
+        allocate(v_b(N, 3))
+
+        ! Rotate into earth fixed coordinates
+        do i = 1, N
+            g_f(i,:) = quat_dependent_to_base(this%g_b(i,:), y(10:13)) + y(7:9)
+            v_b(i,1) = y(1) + y(5)*this%g_b(i,3) - y(6)*this%g_b(i,2)
+            v_b(i,2) = y(2) + y(6)*this%g_b(i,1) - y(4)*this%g_b(i,3)
+            v_b(i,3) = y(3) + y(4)*this%g_b(i,2) - y(5)*this%g_b(i,1)
+            v_f(i,:) = quat_dependent_to_base(v_b(i,:), y(10:13))
+        end do
+
+        F = 0.0
+        M = 0.0
+    
+        ! Determine spring forces and moments
+        do i = 1, N 
+            dummy_F = 0.0
+            if (g_f(i,3) > 0.0) then
+                dummy_F(3) = - this%ks(i)*g_f(i,3) - this%kd(i)*v_f(i,3)
+                dummy_F(1) = -10.0*v_b(i,1) ! Braking force
+                if (dummy_F(3) > 0.0) dummy_F = 0.0
+                M(1) = M(1) + (this%g_b(i,2)*dummy_F(3) - this%g_b(i,3)*dummy_F(2))
+                M(2) = M(2) + (this%g_b(i,3)*dummy_F(1) - this%g_b(i,1)*dummy_F(3))
+                M(3) = M(3) + (this%g_b(i,1)*dummy_F(2) - this%g_b(i,2)*dummy_F(1))
+                F = F + dummy_F
+            end if
+        end do
+
+
+    end subroutine aircraft_landing_gear
+
+
     subroutine aircraft_aerodynamics(this, t, y, F, M, controls)
 
         implicit none
@@ -214,7 +290,7 @@ contains
 
         real :: alpha, beta, pbar, qbar, rbar, V, alphahat
         real :: S_alpha, C_alpha, S_beta, C_beta
-        real :: thrust(3)
+        real :: thrust(3), F_g(3), M_g(3)
 
         !print*, "State vector incoming: ", y
         da = controls(1)
@@ -276,6 +352,11 @@ contains
         M(1) = M(1) + (this%t_location(2)*thrust(3) - this%t_location(3)*thrust(2))
         M(2) = M(2) + (this%t_location(3)*thrust(1) - this%t_location(1)*thrust(3))
         M(3) = M(3) + (this%t_location(1)*thrust(2) - this%t_location(2)*thrust(1))
+
+        ! Add landing gear influence
+        call this%landing_gear(t, y, F_g, M_g)
+        F = F + F_g
+        M = M + M_g
         
         if (verbose) then
             write(*,'(A,3ES20.12)') "F: ", F
