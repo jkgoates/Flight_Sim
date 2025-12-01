@@ -111,7 +111,7 @@
     },
     "initial": {
         "airspeed[ft/s]": 300.0,
-        "altitude[ft]": 500.0,
+        "altitude[ft]": 1000.0,
         "type": "state",
         "state": {
             "alpha[deg]": 0.0,
