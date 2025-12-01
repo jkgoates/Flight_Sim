@@ -23,6 +23,9 @@ module aircraft_m
 
         real, allocatable :: ks(:), kd(:) ! Landing gear spring and damping coefficients
         real, allocatable :: g_b(:,:) ! Landing gear body fixed coordinates
+        real, allocatable :: th_b(:) ! tail hook location
+        real :: ag_ks, ag_kd ! arresting gear coefficients
+        logical :: ag_engaged
         real, allocatable :: collision_points(:,:) ! Aircraft collision points
     
     
@@ -35,6 +38,7 @@ module aircraft_m
         procedure :: init           => aircraft_init
         procedure :: landing_gear   => aircraft_landing_gear
         procedure :: check_collision => aircraft_check_collision
+        procedure :: arresting_gear => aircraft_arresting_gear
         
     
     end type aircraft
@@ -295,6 +299,23 @@ contains
 
 
     end subroutine aircraft_landing_gear
+
+
+    subroutine aircraft_arresting_gear(this, t, y, F, M)
+
+        implicit none
+        
+        class(aircraft), intent(in) :: this
+        real, intent(in) :: t, y(13)
+        real, intent(out) :: F(3), M(3)
+
+        integer :: N, i
+        real :: dummy_F(3)
+        real, allocatable :: g_f(:), v_b(:), v_f(:)
+
+
+
+    end subroutine aircraft_arresting_gear
 
 
     function aircraft_check_collision(this, t, y) result(crashed)

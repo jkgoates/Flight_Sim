@@ -47,6 +47,11 @@
             "left_fin[ft]": [-18.0, -8.5, 0.0],
             "right_fin[ft]": [-18.0, 8.5, 0.0]
         },
+        "arresting_gear":{
+            "spring_constant[lb/ft]": 200,
+
+            "tail_hook": [-14.0, 0.0, 5.0]
+        },
         "aerodynamics": {
             "reference" : {
                 "area[ft^2]": 300.0,
