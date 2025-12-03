@@ -29,7 +29,7 @@
     "scene" : {
         "ground" : {
             "type" : "grid",
-            "altitude[ft]" : 0.0,
+            "altitude[ft]" : -60.0,
             "grid_number" : 40,
             "grid_scale[ft]" : 100.0,
             "color" : "skyblue"
@@ -38,6 +38,11 @@
             "type" : "vtk",
             "filename": "f16_coarse.vtk",
             "color": "black"
+        },
+        "carrier": {
+            "type": "vtk",
+            "filename": "aircraft_carrier.vtk",
+            "color": "grey"
         }
 
     }

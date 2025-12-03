@@ -402,6 +402,7 @@ if __name__ == '__main__':
     fig.canvas.mpl_connect('key_press_event', on_keypress)
     
     ground = LinesObject(input_dict["scene"]["ground"], ax)
+    carrier = LinesObject(input_dict["scene"]["carrier"], ax)
     vehicle = LinesObject(input_dict["scene"]["vehicle"], ax)
 
     vehicle.update([0.0, 0.0, 0.0], [0.0, 0.0, 0.0])
@@ -430,6 +431,7 @@ if __name__ == '__main__':
 
         ground.draw(cam)
         vehicle.draw(cam)
+        carrier.draw(cam)
 
         fig.canvas.draw()
         fig.canvas.flush_events()

@@ -690,7 +690,7 @@ contains
             if (crashed) exit
 
             call graphics%send(s)
-            !controls = controls_conn%recv()
+            controls = controls_conn%recv()
 
         end do
         end_time = get_time()
