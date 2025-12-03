@@ -48,9 +48,11 @@
             "right_fin[ft]": [-18.0, 8.5, 0.0]
         },
         "arresting_gear":{
-            "spring_constant[lb/ft]": 200,
-
-            "tail_hook": [-14.0, 0.0, 5.0]
+            "spring_constant[lb/ft]": 20,
+            "damping_constant[lb-s/ft]": 500,
+            "cable_length[ft]": 50,
+            "cable_distance[ft]": 2000,
+            "tail_hook[ft]": [-14.0, 0.0, 5.0]
         },
         "aerodynamics": {
             "reference" : {
@@ -115,9 +117,9 @@
         }
     },
     "initial": {
-        "airspeed[ft/s]": 300.0,
-        "altitude[ft]": 1000.0,
-        "type": "state",
+        "airspeed[ft/s]": 250.0,
+        "altitude[ft]": 150.0,
+        "type": "trim",
         "state": {
             "alpha[deg]": 0.0,
             "elevator[deg]": 0.0,
@@ -126,7 +128,7 @@
         "trim": {
             "type": "sct",
             "bank_angle[deg]": 0.0,
-            "climb_angle[deg]": -2.0,
+            "climb_angle[deg]": -5.0,
             "solver": {
                 "finite_difference_step_size": 0.01,
                 "relaxation_factor": 0.9,

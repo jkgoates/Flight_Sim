@@ -24,7 +24,7 @@ module aircraft_m
         real, allocatable :: ks(:), kd(:) ! Landing gear spring and damping coefficients
         real, allocatable :: g_b(:,:) ! Landing gear body fixed coordinates
         real, allocatable :: th_b(:) ! tail hook location
-        real :: ag_ks, ag_kd ! arresting gear coefficients
+        real :: ag_ks, ag_kd, ag_length, ag_distance ! arresting gear coefficients
         logical :: ag_engaged
         real, allocatable :: collision_points(:,:) ! Aircraft collision points
     
@@ -178,6 +178,15 @@ contains
             cnt = cnt+1
         end do
 
+        ! Arrestor Gear
+        call jsonx_get(settings, "arresting_gear", p1)
+        call jsonx_get(p1, "spring_constant[lb/ft]", this%ag_ks)
+        call jsonx_get(p1, "damping_constant[lb-s/ft]", this%ag_kd)
+        call jsonx_get(p1, "cable_length[ft]", this%ag_length)
+        call jsonx_get(p1, "cable_distance[ft]", this%ag_distance)
+        call jsonx_get(p1, "tail_hook[ft]", this%th_b)
+        this%ag_engaged = .false.
+
 
     end subroutine aircraft_init
 
@@ -288,7 +297,7 @@ contains
             dummy_F = 0.0
             if (g_f(i,3) > 0.0) then
                 dummy_F(3) = - this%ks(i)*g_f(i,3) - this%kd(i)*v_f(i,3)
-                dummy_F(1) = -10.0*v_b(i,1) ! Braking force
+                !dummy_F(1) = -10.0*v_b(i,1) ! Braking force
                 if (dummy_F(3) > 0.0) dummy_F = 0.0
                 M(1) = M(1) + (this%g_b(i,2)*dummy_F(3) - this%g_b(i,3)*dummy_F(2))
                 M(2) = M(2) + (this%g_b(i,3)*dummy_F(1) - this%g_b(i,1)*dummy_F(3))
@@ -305,15 +314,42 @@ contains
 
         implicit none
         
-        class(aircraft), intent(in) :: this
+        class(aircraft), intent(inout) :: this
         real, intent(in) :: t, y(13)
         real, intent(out) :: F(3), M(3)
 
         integer :: N, i
         real :: dummy_F(3)
-        real, allocatable :: g_f(:), v_b(:), v_f(:)
+        real :: th_f(3), v_b(3), v_f(3)
 
+        ! Rotate into earth fixed coordinates
+        th_f = quat_dependent_to_base(this%th_b(:), y(10:13)) + y(7:9)
+        v_b(1) = y(1) + y(5)*this%th_b(3) - y(6)*this%th_b(2)
+        v_b(2) = y(2) + y(6)*this%th_b(1) - y(4)*this%th_b(3)
+        v_b(3) = y(3) + y(4)*this%th_b(2) - y(5)*this%th_b(1)
+        v_f = quat_dependent_to_base(v_b, y(10:13))
 
+        ! Check if tail hook has caught cable
+        if (.not. this%ag_engaged) then
+            if (th_f(3) > -0.5) then
+                if (abs(th_f(2)) < this%ag_length) then
+                    if (abs(th_f(1) - this%ag_distance) < 0.01) then
+                        this%ag_engaged = .true.
+                    end if
+                end if
+            end if
+        end if
+
+        F = 0.0
+        M = 0.0
+
+        ! Determine forces and moments
+        if (this%ag_engaged) then
+            F(1) = - this%ag_ks*(th_f(1) - this%ag_distance) - this%ag_kd*v_f(1)
+            M(1) = M(1) + (this%th_b(2)*dummy_F(3) - this%th_b(3)*dummy_F(2))
+            M(2) = M(2) + (this%th_b(3)*dummy_F(1) - this%th_b(1)*dummy_F(3))
+            M(3) = M(3) + (this%th_b(1)*dummy_F(2) - this%th_b(2)*dummy_F(1))
+        end if
 
     end subroutine aircraft_arresting_gear
 
@@ -347,7 +383,7 @@ contains
 
         implicit none
     
-        class(aircraft), intent(in) :: this
+        class(aircraft), intent(inout) :: this
         real, intent(in) :: t, y(13)
         real, intent(out) :: F(3), M(3), controls(4)
 
@@ -422,6 +458,9 @@ contains
 
         ! Add landing gear influence
         call this%landing_gear(t, y, F_g, M_g)
+        F = F + F_g
+        M = M + M_g
+        call this%arresting_gear(t, y, F_g, M_g)
         F = F + F_g
         M = M + M_g
         
