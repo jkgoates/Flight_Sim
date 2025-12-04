@@ -50,7 +50,7 @@
         "arresting_gear":{
             "spring_constant[lb/ft]": 10,
             "damping_constant[lb-s/ft]": 500,
-            "cable_length[ft]": 50,
+            "cable_length[ft]": 100,
             "cable_distance[ft]": -200.0,
             "tail_hook[ft]": [-14.0, 0.0, 5.0]
         },
@@ -65,7 +65,7 @@
                 "include_stall": true,
                 "CL": {
                     "alpha_0[deg]": 0.0,
-                    "alpha_s[deg]": 45.0,
+                    "alpha_s[deg]": 43.0,
                     "lambda_b": 7.0
                 },
                 "CD": {
@@ -74,10 +74,10 @@
                     "lambda_b": 7.0
                 },
                 "Cm": {
-                    "min": -0.6314,
-                    "alpha_0[deg]": 0.0,
-                    "alpha_s[deg]": 45.0,
-                    "lambda_b": 7.0
+                    "min": -0.6184,
+                    "alpha_0[deg]": 20.0,
+                    "alpha_s[deg]": 40.0,
+                    "lambda_b": 6.0
                 }
             },
             "coefficients": {

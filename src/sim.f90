@@ -625,6 +625,8 @@ contains
         t = 0.0
         y = y_init
 
+        call vehicle%print_aero_table(norm2(y(1:3)), -y(9))
+
         open(newunit=io_unit, file='sim_output.csv', status='replace', action='write')
         write(io_unit,*) 'time[s], u[ft/s], v[ft/s], w[ft/s], p[rad/s], q[rad/s], r[rad/s], xf[ft], yf[ft], zf[ft], e0, ex, ey, ez'
         write(io_unit,'(ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12, &

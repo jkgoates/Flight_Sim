@@ -32,7 +32,8 @@ module aircraft_m
         real, allocatable :: collision_points(:,:) ! Aircraft collision points
     
         type(stall_settings_t) :: CD_stall, CL_stall, Cm_stall
-    
+        logical :: include_stall
+
     contains
 
         procedure :: mass_inertia   => aircraft_mass_inertia
@@ -43,7 +44,7 @@ module aircraft_m
         procedure :: landing_gear   => aircraft_landing_gear
         procedure :: check_collision => aircraft_check_collision
         procedure :: arresting_gear => aircraft_arresting_gear
-        
+        procedure :: print_aero_table => aircraft_print_aero_table
     
     end type aircraft
     
@@ -139,6 +140,30 @@ contains
         call jsonx_get(coefficients, "Cn.aileron", this%Cn_da)
         call jsonx_get(coefficients, "Cn.alpha_aileron", this%Cn_alpha_da)
         call jsonx_get(coefficients, "Cn.rudder", this%Cn_dr)
+
+
+        ! Stall
+        call jsonx_get(aerodynamics, "stall.include_stall", this%include_stall, .false.)
+        if (this%include_stall) then
+            call jsonx_get(aerodynamics, "stall.CL.alpha_0[deg]", this%CL_stall%alpha_0)
+            call jsonx_get(aerodynamics, "stall.CL.alpha_s[deg]", this%CL_stall%alpha_s)
+            call jsonx_get(aerodynamics, "stall.CL.lambda_b", this%CL_stall%lambda_b)
+            this%CL_stall%alpha_0 = this%CL_stall%alpha_0*pi/180.
+            this%CL_stall%alpha_s = this%CL_stall%alpha_s*pi/180.
+
+            call jsonx_get(aerodynamics, "stall.CD.alpha_0[deg]", this%CD_stall%alpha_0)
+            call jsonx_get(aerodynamics, "stall.CD.alpha_s[deg]", this%CD_stall%alpha_s)
+            call jsonx_get(aerodynamics, "stall.CD.lambda_b", this%CD_stall%lambda_b)
+            this%CD_stall%alpha_0 = this%CD_stall%alpha_0*pi/180.
+            this%CD_stall%alpha_s = this%CD_stall%alpha_s*pi/180.
+
+            call jsonx_get(aerodynamics, "stall.Cm.alpha_0[deg]", this%Cm_stall%alpha_0)
+            call jsonx_get(aerodynamics, "stall.Cm.alpha_s[deg]", this%Cm_stall%alpha_s)
+            call jsonx_get(aerodynamics, "stall.Cm.lambda_b", this%Cm_stall%lambda_b)
+            call jsonx_get(aerodynamics, "stall.Cm.min", this%Cm_stall%minval)
+            this%Cm_stall%alpha_0 = this%Cm_stall%alpha_0*pi/180.
+            this%Cm_stall%alpha_s = this%Cm_stall%alpha_s*pi/180.
+        end if
 
         ! Landing Gear
         call jsonx_get(settings, "landing_gear", p1)
@@ -299,14 +324,17 @@ contains
         ! Determine spring forces and moments
         do i = 1, N 
             dummy_F = 0.0
-            if (g_f(i,3) > 0.0) then
-                dummy_F(3) = - this%ks(i)*g_f(i,3) - this%kd(i)*v_f(i,3)
-                !dummy_F(1) = -10.0*v_b(i,1) ! Braking force
-                if (dummy_F(3) > 0.0) dummy_F = 0.0
-                M(1) = M(1) + (this%g_b(i,2)*dummy_F(3) - this%g_b(i,3)*dummy_F(2))
-                M(2) = M(2) + (this%g_b(i,3)*dummy_F(1) - this%g_b(i,1)*dummy_F(3))
-                M(3) = M(3) + (this%g_b(i,1)*dummy_F(2) - this%g_b(i,2)*dummy_F(1))
-                F = F + dummy_F
+            ! Only land on deck
+            if (abs(g_f(i,1)) < 400.0 .and. abs(g_f(i,2)) < 90.0) then 
+                if (g_f(i,3) > 0.0) then
+                    dummy_F(3) = - this%ks(i)*g_f(i,3) - this%kd(i)*v_f(i,3)
+                    !dummy_F(1) = -10.0*v_b(i,1) ! Braking force
+                    if (dummy_F(3) > 0.0) dummy_F = 0.0
+                    M(1) = M(1) + (this%g_b(i,2)*dummy_F(3) - this%g_b(i,3)*dummy_F(2))
+                    M(2) = M(2) + (this%g_b(i,3)*dummy_F(1) - this%g_b(i,1)*dummy_F(3))
+                    M(3) = M(3) + (this%g_b(i,1)*dummy_F(2) - this%g_b(i,2)*dummy_F(1))
+                    F = F + dummy_F
+                end if
             end if
         end do
 
@@ -374,11 +402,21 @@ contains
 
         crashed = .false.
 
+
         do i = 1, N
             r_f(i,:) = quat_dependent_to_base(this%collision_points(i,:), y(10:13)) + y(7:9)
-            if (r_f(i,3) > 0.0) then
-                crashed = .true.
-                exit
+            if (abs(r_f(i,1)) < 400.0 .and. abs(r_f(i,2)) < 90.0) then 
+                ! Crash on deck
+                if (r_f(i,3) > 0.0) then
+                    crashed = .true.
+                    exit
+                end if
+            else
+                ! Crash on water
+                if (r_f(i,3) > 60.0) then
+                    crashed = .true.
+                    exit
+                end if
             end if
         end do
     end function aircraft_check_collision
@@ -398,6 +436,7 @@ contains
         real :: alpha, beta, pbar, qbar, rbar, V, alphahat
         real :: S_alpha, C_alpha, S_beta, C_beta
         real :: thrust(3), F_g(3), M_g(3)
+        real :: CLnewt, CDnewt, Cmnewt, pos, neg, sigma
 
         !print*, "State vector incoming: ", y
         da = controls(1)
@@ -440,12 +479,28 @@ contains
         S_beta = sin(beta)
         C_beta = cos(beta)
 
-        ! sompute stall CL
-        !CLnewt  = 2.0*sign(alpha)*S_alpha*S_alpha*C_alpha
-        !pos = exp()
-        !neg = exp()
-        !sigma = (1.0 + neg + pos)/((1.0 + neg)*(1.0 + pos))
-        !C_L = (1.0 - sigma)*C_L + sigma*(CLnewt)
+        if (this%include_stall) then
+            ! Compute stall CL
+            CLnewt  = 2.0*sign(1.0,alpha)*S_alpha*S_alpha*C_alpha
+            pos = exp( this%CL_stall%lambda_b*(alpha - this%CL_stall%alpha_0 + this%CL_stall%alpha_s))
+            neg = exp(-this%CL_stall%lambda_b*(alpha - this%CL_stall%alpha_0 - this%CL_stall%alpha_s))
+            sigma = (1.0 + neg + pos)/((1.0 + neg)*(1.0 + pos))
+            C_L = (1.0 - sigma)*C_L + sigma*(CLnewt)
+        
+            ! Compute stall CD
+            CDnewt  = 2.0*sin(abs(alpha))**3
+            pos = exp( this%CD_stall%lambda_b*(alpha - this%CD_stall%alpha_0 + this%CD_stall%alpha_s))
+            neg = exp(-this%CD_stall%lambda_b*(alpha - this%CD_stall%alpha_0 - this%CD_stall%alpha_s))
+            sigma = (1.0 + neg + pos)/((1.0 + neg)*(1.0 + pos))
+            C_D = (1.0 - sigma)*C_D + sigma*(CDnewt)
+
+            ! Compute stall Cm
+            Cmnewt  = this%Cm_stall%minval*sign(1.0,alpha)*S_alpha*S_alpha
+            pos = exp( this%Cm_stall%lambda_b*(alpha - this%Cm_stall%alpha_0 + this%Cm_stall%alpha_s))
+            neg = exp(-this%Cm_stall%lambda_b*(alpha - this%Cm_stall%alpha_0 - this%Cm_stall%alpha_s))
+            sigma = (1.0 + neg + pos)/((1.0 + neg)*(1.0 + pos))
+            C_m = (1.0 - sigma)*C_m + sigma*(Cmnewt)
+        end if
 
         F(1) = 0.5*rho*V**2 * this%S_w * (C_L*S_alpha - C_S*C_alpha*S_beta - C_D*C_alpha*C_beta)
         F(2) = 0.5*rho*V**2 * this%S_w * (C_S*C_beta - C_D*S_beta)
@@ -481,6 +536,60 @@ contains
         end if
         
     end subroutine aircraft_aerodynamics
+
+
+    subroutine aircraft_print_aero_table(this, V, H)
+
+        implicit none
+        class(aircraft), intent(inout) :: this
+        real, intent(in) :: V, H
+        integer :: i, iunit
+        real :: alpha, beta, states(13), F(3), M(3), Ax, N, Y
+        real :: ca, cb, sa, sb
+        real :: CL, CD, Cm
+        real :: Z,T,P,rho,a, mu, const
+        real :: cntrl(4)
+
+        call std_atm_English(H, Z, T, P, rho, a)
+        const = (0.5*rho*V**2*this%S_w)
+
+        cntrl = 0.0
+        states = 0.0
+
+
+        open(newunit=iunit, file='aero_table.csv', status='REPLACE')
+        write(iunit,*) 'alpha[deg], CL, CD, Cm'
+        do i = -180,180,1
+
+            alpha = real(i)*PI/180.0
+            beta = 0.0
+
+            states(1) = V*cos(alpha)*cos(beta)
+            states(2) = V*sin(beta)
+            states(3) = V*sin(alpha)*cos(beta)
+            states(9) = -H
+
+            call this%aerodynamics(0.0, states, F, M, cntrl)
+            Ax = -F(1)
+            Y = F(2)
+            N = -F(3)
+
+            ca = cos(alpha)
+            cb = cos(beta)
+            sa = sin(alpha)
+            sb = sin(beta)
+
+            CL = N*ca - Ax*sa
+            CD = Ax*ca*cb - Y*sb + N*sa*cb
+            Cm = M(2)
+
+            CL = CL/const
+            CD = CD/const
+            Cm = cm/(const*this%c)
+
+            write(iunit, *) alpha*180./PI, ',', CL,',',CD,',',Cm
+        end do
+    end subroutine aircraft_print_aero_table
     
 end module aircraft_m
 

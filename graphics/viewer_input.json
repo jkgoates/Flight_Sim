@@ -31,7 +31,7 @@
             "type" : "grid",
             "altitude[ft]" : -60.0,
             "grid_number" : 40,
-            "grid_scale[ft]" : 100.0,
+            "grid_scale[ft]" : 200.0,
             "color" : "skyblue"
         },
         "vehicle": {
