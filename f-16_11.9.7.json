@@ -136,16 +136,16 @@
         }
     },
     "initial": {
-        "airspeed[ft/s]": 250.0,
-        "altitude[ft]": 800.0,
+        "airspeed[ft/s]": 1.0,
+        "altitude[ft]": 5.0,
         "type": "state",
         "state": {
-            "xf[ft]": -5000.0,
-            "alpha[deg]": 14.22,
-            "theta[deg]": 9.22,
-            "elevator[deg]": -11.70559,
-            "phi[deg]": 0.0,
-            "throttle": 0.054
+            "xf[ft]": -150.0,
+            "xalpha[deg]": 14.22,
+            "xtheta[deg]": 9.22,
+            "xelevator[deg]": -11.70559,
+            "xphi[deg]": 0.0,
+            "xthrottle": 0.054
         },
         "trim": {
             "type": "sct",
