@@ -415,6 +415,7 @@ if __name__ == '__main__':
     elevator = 0.0
     throttle = 0.5
     
+    #vehicle.draw(cam)
 
     while run:
         if cnt == 0:
