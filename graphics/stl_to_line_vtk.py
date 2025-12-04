@@ -100,7 +100,7 @@ with open(vtkfile, 'w') as writer:
     writer.write('DATASET POLYDATA\n')
     writer.write(f'POINTS {npoints} float\n')
     for i in range(npoints):
-        writer.write(f'{5.0*points[i,0]:.6e} {5.0*points[i,1]:.6e} {-5.0*points[i,2]:.6e}\n')
+        writer.write(f'{5.0*points[i,0]:.6e} {5.0*points[i,1]:.6e} {-5.0*points[i,2]+15:.6e}\n')
     writer.write(f'LINES {nlines} {3*nlines}\n')
     for i in range(nlines):
         writer.write(f'2 {lineid[i,0]} {lineid[i,1]}\n')
