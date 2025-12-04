@@ -4,6 +4,9 @@ module aircraft_m
 
     implicit none
 
+    type stall_settings_t
+        real :: alpha_0, alpha_s, lambda_b, minval        
+    end type stall_settings_t
     
     type :: aircraft
         
@@ -28,6 +31,7 @@ module aircraft_m
         logical :: ag_engaged
         real, allocatable :: collision_points(:,:) ! Aircraft collision points
     
+        type(stall_settings_t) :: CD_stall, CL_stall, Cm_stall
     
     contains
 
@@ -399,6 +403,13 @@ contains
         C_alpha = cos(alpha)
         S_beta = sin(beta)
         C_beta = cos(beta)
+
+        ! sompute stall CL
+        !CLnewt  = 2.0*sign(alpha)*S_alpha*S_alpha*C_alpha
+        !pos = exp()
+        !neg = exp()
+        !sigma = (1.0 + neg + pos)/((1.0 + neg)*(1.0 + pos))
+        !C_L = (1.0 - sigma)*C_L + sigma*(CLnewt)
 
         F(1) = 0.5*rho*V**2 * this%S_w * (C_L*S_alpha - C_S*C_alpha*S_beta - C_D*C_alpha*C_beta)
         F(2) = 0.5*rho*V**2 * this%S_w * (C_S*C_beta - C_D*S_beta)

@@ -59,6 +59,25 @@
                 "lateral_length[ft]": 30.0,
                 "relative_location[ft]": [-1.0, 0.0, 0.0]
             },
+            "stall":{
+                "include_stall": true,
+                "CL": {
+                    "alpha_0[deg]": 0.0,
+                    "alpha_s[deg]": 45.0,
+                    "lambda_b": 7.0
+                },
+                "CD": {
+                    "alpha_0[deg]": 5.0,
+                    "alpha_s[deg]": 45.0,
+                    "lambda_b": 7.0
+                },
+                "Cm": {
+                    "min": -0.6314,
+                    "alpha_0[deg]": 0.0,
+                    "alpha_s[deg]": 45.0,
+                    "lambda_b": 7.0
+                }
+            },
             "coefficients": {
                 "CL" : {
                     "0": 0.0535,
