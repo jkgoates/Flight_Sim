@@ -68,7 +68,10 @@ class Camera:
         R_inv = sp.linalg.inv(self.R)
 
         if self.type == 'follow':
-            self.pos = self.pos + self.distance*np.matmul(R_inv, self.vel/np.linalg.norm(self.vel))
+            dummy = self.vel
+            if (dummy[0] < 50.0):
+                dummy[0] = 50.0
+            self.pos = self.pos + self.distance*np.matmul(R_inv, dummy/np.linalg.norm(dummy))
 
         self.r_f_vp = np.matmul(R_inv, self.r_c_vp) + self.pos[:,np.newaxis]
 

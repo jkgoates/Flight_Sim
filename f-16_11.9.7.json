@@ -49,9 +49,9 @@
         },
         "arresting_gear":{
             "spring_constant[lb/ft]": 20,
-            "damping_constant[lb-s/ft]": 500,
+            "damping_constant[lb-s/ft]": 1500,
             "cable_length[ft]": 50,
-            "cable_distance[ft]": 2000,
+            "cable_distance[ft]": 1700,
             "tail_hook[ft]": [-14.0, 0.0, 5.0]
         },
         "aerodynamics": {
