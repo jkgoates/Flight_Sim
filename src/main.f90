@@ -1,5 +1,5 @@
 program main
-    use simulation_m
+    use sim_m
 
     implicit none
 

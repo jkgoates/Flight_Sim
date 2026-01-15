@@ -35,7 +35,7 @@
 fort.*
 
 # Other stuf
-.csv
+*.csv
 
 # python stuff
 __pycache__/
