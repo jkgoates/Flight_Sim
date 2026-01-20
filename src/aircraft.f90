@@ -1,5 +1,6 @@
-module aircraft_m
+module vehicle_m 
     use goates_m
+    use linalg_mod
     use jsonx_m
 
     implicit none
@@ -39,22 +40,26 @@ module aircraft_m
     contains
 
         procedure :: mass_inertia   => aircraft_mass_inertia
-        procedure :: aerodynamics   => aircraft_aerodynamics
+        procedure :: pseudo_aero    => aircraft_pseudo_aero
         procedure :: gyroscopic     => aircraft_gyroscopic
         procedure :: thrust         => aircraft_thrust
         procedure :: init           => aircraft_init
         procedure :: init_to_state  => aircraft_init_to_state
         procedure :: init_to_trim   => aircraft_init_to_trim
-        procedure :: landing_gear   => aircraft_landing_gear
-        procedure :: check_collision => aircraft_check_collision
-        procedure :: arresting_gear => aircraft_arresting_gear
+        !procedure :: landing_gear   => aircraft_landing_gear
+        !procedure :: check_collision => aircraft_check_collision
+        !procedure :: arresting_gear => aircraft_arresting_gear
         procedure :: print_aero_table => aircraft_print_aero_table
+        procedure :: tick_states => aircraft_tick_states
+        procedure :: calc_R        => aircraft_calc_R
+        procedure :: runge_kutta => aircraft_runge_kutta
+        procedure :: diff_eq       => aircraft_diff_eq
     
     end type aircraft
     
 contains
 
-    subroutine aircraft_init(this, settings)
+    subroutine aircraft_init(this, settings, j_initial)
     
         class(aircraft), intent(inout) :: this
         type(json_value), pointer, intent(in) :: settings, j_initial
@@ -233,9 +238,9 @@ contains
 
         select case(init_type)
         case("state")
-            call this%init_to_state(V,H)
+            call this%init_to_state(j_initial, V,H)
         case("trim")
-            call this%init_to_trim(V,H)
+            call this%init_to_trim(j_initial, V,H)
         case default
             write(*,*) "!!! Type "//init_type//" is not recognized as a valid init type. Quitting..."
             stop
@@ -268,10 +273,10 @@ contains
         call jsonx_get(j_initial, "state.theta[deg]", theta, default_value=0.0)
         call jsonx_get(j_initial, "state.psi[deg]", psi, default_value=0.0)
 
-        controls(1) = da*PI/180.
-        controls(2) = de*PI/180.
-        controls(3) = dr*PI/180.
-        controls(4) = throttle
+        this%controls(1) = da*PI/180.
+        this%controls(2) = de*PI/180.
+        this%controls(3) = dr*PI/180.
+        this%controls(4) = throttle
 
         phi = phi*PI/180.
         theta = theta*PI/180.
@@ -281,22 +286,22 @@ contains
         alpha = alpha *PI/180.
         beta  = beta  *PI/180.
 
-        states = 0.0
+        this%states = 0.0
 
-        states(1) = V_mag*cos(alpha)*cos(beta)
-        states(2) = V_mag*sin(beta)
-        states(3) = V_mag*sin(alpha)*cos(beta)
+        this%states(1) = V_mag*cos(alpha)*cos(beta)
+        this%states(2) = V_mag*sin(beta)
+        this%states(3) = V_mag*sin(alpha)*cos(beta)
 
 
-        states(4) = p*PI/180.
-        states(5) = q*PI/180.
-        states(6) = r*PI/180.
+        this%states(4) = p*PI/180.
+        this%states(5) = q*PI/180.
+        this%states(6) = r*PI/180.
 
-        states(7) = xf
-        states(8) = yf
-        states(9) = -H
+        this%states(7) = xf
+        this%states(8) = yf
+        this%states(9) = -H
 
-        states(10:13) = euler_to_quat((/phi, theta, psi/))
+        this%states(10:13) = euler_to_quat((/phi, theta, psi/))
 
     end subroutine aircraft_init_to_state
 
@@ -451,7 +456,7 @@ contains
 
             write(*,*) "G defined as G = [alpha, beta, da, de, dr, throttle]"
             write(*,'(A,6ES20.12)') " G = ", G
-            R = calc_R(V_mag, H, rot_rates, G, var, theta, psi, solve_bank)
+            R = this%calc_R(V_mag, H, rot_rates, G, var, theta, psi, solve_bank)
             write(*,'(A,6ES20.12)') " R = ", R
 
             ! Solve for trim state
@@ -476,13 +481,13 @@ contains
                 G(k) = G(k) + fd_step
                 write(*,*) "    Positive Finite Difference Step"
                 write(*,'(A,6ES20.12)') "        G = ", G
-                R_1 = calc_R(V_mag, H, rot_rates, G, var, theta, psi, solve_bank)
+                R_1 = this%calc_R(V_mag, H, rot_rates, G, var, theta, psi, solve_bank)
                 write(*,'(A,6ES20.12)') "        R = ", R_1
 
                 G(k) = G(k) - 2*fd_step
                 write(*,*) "    Negative Finite Difference Step"
                 write(*,'(A,6ES20.12)') "        G = ", G
-                R_2 = calc_R(V_mag, H, rot_rates, G, var, theta, psi, solve_bank)
+                R_2 = this%calc_R(V_mag, H, rot_rates, G, var, theta, psi, solve_bank)
                 write(*,'(A,6ES20.12)') "        R = ", R_2
 
                 do l = 1,6
@@ -497,7 +502,7 @@ contains
             end do
 
             ! Calculate R
-            R = calc_R(V_mag, H, rot_rates, G, var, theta, psi, solve_bank)
+            R = this%calc_R(V_mag, H, rot_rates, G, var, theta, psi, solve_bank)
 
             call lu_solve(6, J, -R, dG)
 
@@ -510,7 +515,7 @@ contains
             write(*,'(A,6ES20.12)') "New G:   ", G
         
             ! Calculate error
-            error = maxval(abs(calc_R(V_mag, H, rot_rates, G, var, theta, psi, solve_bank)))
+            error = maxval(abs(this%calc_R(V_mag, H, rot_rates, G, var, theta, psi, solve_bank)))
 
 
             write(*,'(A,I4,A,ES20.12)') "Iteration: ", i, " Error: ", error
@@ -548,30 +553,31 @@ contains
 
 
         ! Set initial conditions
-        controls(1) = da
-        controls(2) = de
-        controls(3) = dr
-        controls(4) = throttle
+        this%controls(1) = da
+        this%controls(2) = de
+        this%controls(3) = dr
+        this%controls(4) = throttle
 
-        states = 0.0
+        this%states = 0.0
 
-        states(1) = V_mag*cos(alpha)*cos(beta)
-        states(2) = V_mag*sin(beta)
-        states(3) = V_mag*sin(alpha)*cos(beta)
+        this%states(1) = V_mag*cos(alpha)*cos(beta)
+        this%states(2) = V_mag*sin(beta)
+        this%states(3) = V_mag*sin(alpha)*cos(beta)
 
 
-        states(4) = rot_rates(1)
-        states(5) = rot_rates(2)
-        states(6) = rot_rates(3)
+        this%states(4) = rot_rates(1)
+        this%states(5) = rot_rates(2)
+        this%states(6) = rot_rates(3)
 
-        states(9) = -H
+        this%states(9) = -H
 
-        states(10:13) = euler_to_quat((/phi, theta, psi/))
+        this%states(10:13) = euler_to_quat((/phi, theta, psi/))
     end subroutine aircraft_init_to_trim
 
-    function calc_R(V, H, rot_rates, G, var, theta, psi, solve_bank) result(R)
+    function aircraft_calc_R(this, V, H, rot_rates, G, var, theta, psi, solve_bank) result(R)
 
         implicit none
+        class(aircraft), intent(inout) :: this
         real, intent(in) :: V, H, G(6), rot_rates(3), var, theta, psi
         logical, intent(in) :: solve_bank
         real :: alpha, beta, phi
@@ -589,7 +595,7 @@ contains
             beta = G(2)
             phi = var
         end if
-        controls = G(3:6)
+        this%controls = G(3:6)
 
         ! Set state
         y_temp = 0.0
@@ -606,50 +612,51 @@ contains
         y_temp(10:13) = euler_to_quat((/phi, theta, psi/))
 
         ! Run diff_eq
-        dy_dt = differential_equations(0.0, y_temp)
+        dy_dt = this%diff_eq( y_temp)
         
         R = dy_dt(1:6)
 
-    end function calc_R
-    
-    function runge_kutta(t_0, y_0, dt) result(y)
+    end function aircraft_calc_R
+
+    function aircraft_runge_kutta(this, y_0, dt) result(y)
 
         implicit none
-        
-        real, intent(in) :: t_0, y_0(13), dt
+
+        class(aircraft), intent(inout) :: this
+        real, intent(in) :: y_0(13), dt
         real :: y(13)
 
         real :: k1(13), k2(13), k3(13), k4(13)
 
 
-        k1 = differential_equations(t_0, y_0)
-        k2 = differential_equations(t_0 + 0.5*dt, y_0 + k1*0.5*dt)
-        k3 = differential_equations(t_0 + 0.5*dt, y_0 + k2*0.5*dt)
-        k4 = differential_equations(t_0 + dt, y_0 + k3*dt)
+        k1 = this%diff_eq(y_0)
+        k2 = this%diff_eq(y_0 + k1*0.5*dt)
+        k3 = this%diff_eq(y_0 + k2*0.5*dt)
+        k4 = this%diff_eq(y_0 + k3*dt)
 
         y = y_0 + (dt*one_sixth)*(k1 + 2*k2 + 2*k3 + k4)
 
-    end function runge_kutta
+    end function aircraft_runge_kutta
 
-    function differential_equations(t, y) result(dy_dt)
+    function aircraft_diff_eq(this, y) result(dy_dt)
 
         implicit none
         
-        real, intent(in) :: t, y(13)
+        class(aircraft), intent(inout) :: this        
+        real, intent(in) :: y(13)
         real :: dy_dt(13)
 
         real :: mass, I(3,3), F(3), M(3), g, I_inv(3,3), dummy(3), h(3)
 
         if (verbose) then
-            write(*,*) "t: ", t
             write(*,'(A,13ES20.12)') "y: ", y
         end if
 
         g = gravity_English(-y(9))
 
-        call vehicle%mass_inertia(t, y, mass, I)
-        call vehicle%aerodynamics(t, y, F, M, controls)
-        call vehicle%gyroscopic(t, y, h)
+        call this%mass_inertia(y, mass, I)
+        call this%pseudo_aero(y, F, M)
+        call this%gyroscopic(y, h)
 
         dy_dt = 0.0
 
@@ -700,18 +707,16 @@ contains
             write(*,*) "----------------------"
         end if
 
-    end function differential_equations
+    end function aircraft_diff_eq
 
-    subroutine aircraft_mass_inertia(this, t, y, mass, I)
+    subroutine aircraft_mass_inertia(this, y, mass, I)
     
         class(aircraft), intent(in) :: this
-        real, intent(in) :: t, y(13)
+        real, intent(in) :: y(13)
         real, intent(out) :: mass, I(3,3)
 
         real :: E(3,3)
        
-        !mass = this%M*0.3048/g_ssl ! Convert lbf to slugs
-        !mass = this%M/32.1740485564304 ! Convert lbf to slugs
         mass = this%M/gravity_English(0.0)
         I(1,1) = this%Ixx
         I(2,2) = this%Iyy
@@ -724,26 +729,13 @@ contains
         I(1,3) = -this%Ixz
         I(3,1) = -this%Ixz
 
-        ! identity matrix
-        E = 0.0
-        E(1,1) = 1.0
-        E(2,2) = 1.0
-        E(3,3) = 1.0
-
-        ! Apply CG shift to inertia matrix
-        ! THIS EQUATION IS WRONG BUT IS USED TO CHECK BOOK EXAMPLES
-        !I = I + mass * (dot_product(this%CG_shift, this%CG_shift)*E &
-                        !- matmul(reshape(this%CG_shift, [3,1]), reshape(this%CG_shift, [1,3])))
-        ! THIS IS THE CORRECT EQUATION
-        !I = I - mass * (dot_product(this%CG_shift, this%CG_shift)*E &
-                        !- matmul(reshape(this%CG_shift, [3,1]), reshape(this%CG_shift, [1,3])))
         
     end subroutine aircraft_mass_inertia
 
-    subroutine aircraft_gyroscopic(this, t, y, h)
+    subroutine aircraft_gyroscopic(this, y, h)
     
         class(aircraft), intent(in) :: this
-        real, intent(in) :: t, y(13)
+        real, intent(in) :: y(13)
         real, intent(out) :: h(3)
         
         h(1) = this%hx
@@ -752,12 +744,12 @@ contains
         
     end subroutine aircraft_gyroscopic
 
-    function aircraft_thrust(this, t, y, throttle) result(thrust)
+    function aircraft_thrust(this, y, throttle) result(thrust)
    
         implicit none
         
         class(aircraft), intent(in) :: this
-        real, intent(in) :: t, y(13), throttle
+        real, intent(in) :: y(13), throttle
         
         real :: thrust(3)
 
@@ -774,143 +766,143 @@ contains
 
     end function aircraft_thrust
 
-    subroutine aircraft_landing_gear(this, t, y, F, M)
+    !subroutine aircraft_landing_gear(this, t, y, F, M)
 
-        implicit none
+        !implicit none
         
-        class(aircraft), intent(in) :: this
-        real, intent(in) :: t, y(13)
-        real, intent(out) :: F(3), M(3)
+        !class(aircraft), intent(in) :: this
+        !real, intent(in) :: t, y(13)
+        !real, intent(out) :: F(3), M(3)
 
-        integer :: N, i
-        real :: dummy_F(3)
-        real, allocatable :: g_f(:,:), v_b(:,:), v_f(:,:)
+        !integer :: N, i
+        !real :: dummy_F(3)
+        !real, allocatable :: g_f(:,:), v_b(:,:), v_f(:,:)
 
-        N = size(this%ks)
+        !N = size(this%ks)
 
-        allocate(g_f(N, 3))
-        allocate(v_f(N, 3))
-        allocate(v_b(N, 3))
+        !allocate(g_f(N, 3))
+        !allocate(v_f(N, 3))
+        !allocate(v_b(N, 3))
 
-        ! Rotate into earth fixed coordinates
-        do i = 1, N
-            g_f(i,:) = quat_dependent_to_base(this%g_b(i,:), y(10:13)) + y(7:9)
-            v_b(i,1) = y(1) + y(5)*this%g_b(i,3) - y(6)*this%g_b(i,2)
-            v_b(i,2) = y(2) + y(6)*this%g_b(i,1) - y(4)*this%g_b(i,3)
-            v_b(i,3) = y(3) + y(4)*this%g_b(i,2) - y(5)*this%g_b(i,1)
-            v_f(i,:) = quat_dependent_to_base(v_b(i,:), y(10:13))
-        end do
+        !! Rotate into earth fixed coordinates
+        !do i = 1, N
+            !g_f(i,:) = quat_dependent_to_base(this%g_b(i,:), y(10:13)) + y(7:9)
+            !v_b(i,1) = y(1) + y(5)*this%g_b(i,3) - y(6)*this%g_b(i,2)
+            !v_b(i,2) = y(2) + y(6)*this%g_b(i,1) - y(4)*this%g_b(i,3)
+            !v_b(i,3) = y(3) + y(4)*this%g_b(i,2) - y(5)*this%g_b(i,1)
+            !v_f(i,:) = quat_dependent_to_base(v_b(i,:), y(10:13))
+        !end do
 
-        F = 0.0
-        M = 0.0
+        !F = 0.0
+        !M = 0.0
     
-        ! Determine spring forces and moments
-        do i = 1, N 
-            dummy_F = 0.0
-            ! Only land on deck
-            if (abs(g_f(i,1)) < 400.0 .and. abs(g_f(i,2)) < 90.0) then 
-                if (g_f(i,3) > 0.0) then
-                    dummy_F(3) = - this%ks(i)*g_f(i,3) - this%kd(i)*v_f(i,3)
-                    !dummy_F(1) = -10.0*v_b(i,1) ! Braking force
-                    if (dummy_F(3) > 0.0) dummy_F = 0.0
-                    M(1) = M(1) + (this%g_b(i,2)*dummy_F(3) - this%g_b(i,3)*dummy_F(2))
-                    M(2) = M(2) + (this%g_b(i,3)*dummy_F(1) - this%g_b(i,1)*dummy_F(3))
-                    M(3) = M(3) + (this%g_b(i,1)*dummy_F(2) - this%g_b(i,2)*dummy_F(1))
-                    F = F + dummy_F
-                end if
-            end if
-        end do
+        !! Determine spring forces and moments
+        !do i = 1, N 
+            !dummy_F = 0.0
+            !! Only land on deck
+            !if (abs(g_f(i,1)) < 400.0 .and. abs(g_f(i,2)) < 90.0) then 
+                !if (g_f(i,3) > 0.0) then
+                    !dummy_F(3) = - this%ks(i)*g_f(i,3) - this%kd(i)*v_f(i,3)
+                    !!dummy_F(1) = -10.0*v_b(i,1) ! Braking force
+                    !if (dummy_F(3) > 0.0) dummy_F = 0.0
+                    !M(1) = M(1) + (this%g_b(i,2)*dummy_F(3) - this%g_b(i,3)*dummy_F(2))
+                    !M(2) = M(2) + (this%g_b(i,3)*dummy_F(1) - this%g_b(i,1)*dummy_F(3))
+                    !M(3) = M(3) + (this%g_b(i,1)*dummy_F(2) - this%g_b(i,2)*dummy_F(1))
+                    !F = F + dummy_F
+                !end if
+            !end if
+        !end do
 
 
-    end subroutine aircraft_landing_gear
+    !end subroutine aircraft_landing_gear
 
 
-    subroutine aircraft_arresting_gear(this, t, y, F, M)
+    !subroutine aircraft_arresting_gear(this, t, y, F, M)
 
-        implicit none
+        !implicit none
         
-        class(aircraft), intent(inout) :: this
-        real, intent(in) :: t, y(13)
-        real, intent(out) :: F(3), M(3)
+        !class(aircraft), intent(inout) :: this
+        !real, intent(in) :: t, y(13)
+        !real, intent(out) :: F(3), M(3)
 
-        integer :: N, i
-        real :: dummy_F(3)
-        real :: th_f(3), v_b(3), v_f(3)
+        !integer :: N, i
+        !real :: dummy_F(3)
+        !real :: th_f(3), v_b(3), v_f(3)
 
-        ! Rotate into earth fixed coordinates
-        th_f = quat_dependent_to_base(this%th_b(:), y(10:13)) + y(7:9)
-        v_b(1) = y(1) + y(5)*this%th_b(3) - y(6)*this%th_b(2)
-        v_b(2) = y(2) + y(6)*this%th_b(1) - y(4)*this%th_b(3)
-        v_b(3) = y(3) + y(4)*this%th_b(2) - y(5)*this%th_b(1)
-        v_f = quat_dependent_to_base(v_b, y(10:13))
+        !! Rotate into earth fixed coordinates
+        !th_f = quat_dependent_to_base(this%th_b(:), y(10:13)) + y(7:9)
+        !v_b(1) = y(1) + y(5)*this%th_b(3) - y(6)*this%th_b(2)
+        !v_b(2) = y(2) + y(6)*this%th_b(1) - y(4)*this%th_b(3)
+        !v_b(3) = y(3) + y(4)*this%th_b(2) - y(5)*this%th_b(1)
+        !v_f = quat_dependent_to_base(v_b, y(10:13))
 
-        ! Check if tail hook has caught cable
-        if (.not. this%ag_engaged) then
-            if (th_f(3) > -0.5) then
-                if (abs(th_f(2)) < this%ag_length) then
-                    if (abs(th_f(1) - this%ag_distance) < 0.01) then
-                        this%ag_engaged = .true.
-                    end if
-                end if
-            end if
-        end if
+        !! Check if tail hook has caught cable
+        !if (.not. this%ag_engaged) then
+            !if (th_f(3) > -0.5) then
+                !if (abs(th_f(2)) < this%ag_length) then
+                    !if (abs(th_f(1) - this%ag_distance) < 0.01) then
+                        !this%ag_engaged = .true.
+                    !end if
+                !end if
+            !end if
+        !end if
 
-        F = 0.0
-        M = 0.0
+        !F = 0.0
+        !M = 0.0
 
-        ! Determine forces and moments
-        if (this%ag_engaged) then
-            F(1) = - this%ag_ks*(th_f(1) - this%ag_distance) - this%ag_kd*v_f(1)
-            M(1) = M(1) + (this%th_b(2)*dummy_F(3) - this%th_b(3)*dummy_F(2))
-            M(2) = M(2) + (this%th_b(3)*dummy_F(1) - this%th_b(1)*dummy_F(3))
-            M(3) = M(3) + (this%th_b(1)*dummy_F(2) - this%th_b(2)*dummy_F(1))
-        end if
+        !! Determine forces and moments
+        !if (this%ag_engaged) then
+            !F(1) = - this%ag_ks*(th_f(1) - this%ag_distance) - this%ag_kd*v_f(1)
+            !M(1) = M(1) + (this%th_b(2)*dummy_F(3) - this%th_b(3)*dummy_F(2))
+            !M(2) = M(2) + (this%th_b(3)*dummy_F(1) - this%th_b(1)*dummy_F(3))
+            !M(3) = M(3) + (this%th_b(1)*dummy_F(2) - this%th_b(2)*dummy_F(1))
+        !end if
 
-    end subroutine aircraft_arresting_gear
+    !end subroutine aircraft_arresting_gear
 
 
-    function aircraft_check_collision(this, t, y) result(crashed)
-        implicit none
+    !function aircraft_check_collision(this, t, y) result(crashed)
+        !implicit none
         
-        class(aircraft), intent(in) :: this
-        real, intent(in) :: t, y(13)
+        !class(aircraft), intent(in) :: this
+        !real, intent(in) :: t, y(13)
 
-        logical :: crashed
+        !logical :: crashed
 
-        integer :: N, i
-        real, allocatable :: r_f(:,:)
+        !integer :: N, i
+        !real, allocatable :: r_f(:,:)
 
-        N = size(this%collision_points, 1)
-        allocate(r_f(N,3))
+        !N = size(this%collision_points, 1)
+        !allocate(r_f(N,3))
 
-        crashed = .false.
+        !crashed = .false.
 
 
-        do i = 1, N
-            r_f(i,:) = quat_dependent_to_base(this%collision_points(i,:), y(10:13)) + y(7:9)
-            if (abs(r_f(i,1)) < 400.0 .and. abs(r_f(i,2)) < 90.0) then 
-                ! Crash on deck
-                if (r_f(i,3) > 0.0) then
-                    crashed = .true.
-                    exit
-                end if
-            else
-                ! Crash on water
-                if (r_f(i,3) > 60.0) then
-                    crashed = .true.
-                    exit
-                end if
-            end if
-        end do
-    end function aircraft_check_collision
+        !do i = 1, N
+            !r_f(i,:) = quat_dependent_to_base(this%collision_points(i,:), y(10:13)) + y(7:9)
+            !if (abs(r_f(i,1)) < 400.0 .and. abs(r_f(i,2)) < 90.0) then 
+                !! Crash on deck
+                !if (r_f(i,3) > 0.0) then
+                    !crashed = .true.
+                    !exit
+                !end if
+            !else
+                !! Crash on water
+                !if (r_f(i,3) > 60.0) then
+                    !crashed = .true.
+                    !exit
+                !end if
+            !end if
+        !end do
+    !end function aircraft_check_collision
 
-    subroutine aircraft_aerodynamics(this, t, y, F, M, controls)
+    subroutine aircraft_pseudo_aero(this,y,F,M)
 
         implicit none
     
         class(aircraft), intent(inout) :: this
-        real, intent(in) :: t, y(13)
-        real, intent(out) :: F(3), M(3), controls(4)
+        real, intent(in) :: y(13)
+        real, intent(out) :: F(3), M(3)
 
         real :: Z, Temp, P, rho, a
         real :: C_L1, C_L, C_D, C_S, C_ell, C_m, C_n
@@ -922,10 +914,10 @@ contains
         real :: CLnewt, CDnewt, Cmnewt, pos, neg, sigma
 
         !print*, "State vector incoming: ", y
-        da = controls(1)
-        de = controls(2)
-        dr = controls(3)
-        throttle = controls(4)
+        da = this%controls(1)
+        de = this%controls(2)
+        dr = this%controls(3)
+        throttle = this%controls(4)
 
         ! Get atmosphere
         call std_atm_English(-y(9), Z, temp, P, rho, a)
@@ -999,26 +991,40 @@ contains
         M(3) = M(3) + (this%CG_shift(1)*F(2) - this%CG_shift(2)*F(1))
 
         ! Add thrust influence
-        thrust = this%thrust(t, y, throttle)
+        thrust = this%thrust(y, throttle)
         F = F + thrust
         M(1) = M(1) + (this%t_location(2)*thrust(3) - this%t_location(3)*thrust(2))
         M(2) = M(2) + (this%t_location(3)*thrust(1) - this%t_location(1)*thrust(3))
         M(3) = M(3) + (this%t_location(1)*thrust(2) - this%t_location(2)*thrust(1))
 
         ! Add landing gear influence
-        call this%landing_gear(t, y, F_g, M_g)
-        F = F + F_g
-        M = M + M_g
-        call this%arresting_gear(t, y, F_g, M_g)
-        F = F + F_g
-        M = M + M_g
+        !call this%landing_gear(t, y, F_g, M_g)
+        !F = F + F_g
+        !M = M + M_g
+        !call this%arresting_gear(t, y, F_g, M_g)
+        !F = F + F_g
+        !M = M + M_g
         
         if (verbose) then
             write(*,'(A,3ES20.12)') "F: ", F
             write(*,'(A,3ES20.12)') "M: ", M
         end if
         
-    end subroutine aircraft_aerodynamics
+    end subroutine aircraft_pseudo_aero
+
+
+    function aircraft_tick_states(this, dt) result(new_states)
+
+        implicit none
+        
+        class(aircraft), intent(inout) :: this
+        real, intent(in) :: dt
+        real :: new_states(13)
+
+
+        new_states = this%runge_kutta(this%states, dt)
+
+    end function aircraft_tick_states
 
 
     subroutine aircraft_print_aero_table(this, V, H)
@@ -1052,7 +1058,7 @@ contains
             states(3) = V*sin(alpha)*cos(beta)
             states(9) = -H
 
-            call this%aerodynamics(0.0, states, F, M, cntrl)
+            call this%pseudo_aero(states, F, M)
             Ax = -F(1)
             Y = F(2)
             N = -F(3)
@@ -1074,5 +1080,5 @@ contains
         end do
     end subroutine aircraft_print_aero_table
     
-end module aircraft_m
+end module vehicle_m 
 

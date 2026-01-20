@@ -11,6 +11,7 @@ module goates_m
     real,parameter :: R_gas = 287.0528
     real,parameter :: gamma = 1.4
     real,parameter :: P_ssl = 101325.0 ! Standard Sea Level Pressure in N/m^2
+    real, parameter :: one_sixth = 1./6.
 
     ! CONVERSION FACTORS
     real,parameter :: Pa_to_lbf_ft2 = 1.0/47.880258
@@ -25,7 +26,7 @@ module goates_m
                 1.1090558898922531e2, 5.9000524278924367e1, 1.8209924905017658e1, 1.0377004548920223]
 
     ! OTHER STUFF
-    logical :: verbose
+    logical :: verbose, save_states
     
 contains
     
