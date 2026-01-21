@@ -103,7 +103,7 @@ contains
 
         ! Thrust Properties
         call jsonx_get(settings, "thrust.T0[lbf]", this%T0, 0.0)
-        call jsonx_get(settings, "thrust.a", this%a, 0.0)
+        call jsonx_get(settings, "thrust.Ta", this%a, 0.0)
         call jsonx_get(settings, "thrust.location[ft]", this%t_location, 0.0, 3)
         call jsonx_get(settings, "thrust.orientation[deg]", this%t_orientation, 0.0, 3)
         this%t_orientation = this%t_orientation*pi/180.0
@@ -786,6 +786,8 @@ contains
         call std_atm_English(-y(9), Z, temp, P, rho, a)
         call std_atm_English(0.0, Z_0, temp_0, P_0, rho_0, a_0)
 
+        write(*,*) "T0: ", this%T0
+        write(*,*) "a: ", this%a
         thrust = 0.0
         thrust(1) = throttle*this%T0*(rho/rho_0)**this%a
         if (throttle < 0.0) thrust = 0.0

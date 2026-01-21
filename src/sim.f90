@@ -121,7 +121,12 @@ contains
         do while (t < tf)
 
             if (verbose) then
+                write(*,*) 
+                write(*,*) 
+                write(*,*) "------------------------"
                 write(*,*) "time: ", t, " s"
+                write(*,*) "------------------------"
+                write(*,*) 
             end if
 
             do i = 1, size(vehicles)
