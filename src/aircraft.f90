@@ -743,6 +743,7 @@ contains
         real :: E(3,3)
        
         mass = this%M/gravity_English(0.0)
+        I = 0.0
         I(1,1) = this%Ixx
         I(2,2) = this%Iyy
         I(3,3) = this%Izz
@@ -1097,12 +1098,22 @@ contains
         real :: new_states(13)
 
 
-        if (verbose) then
-            write(*,*) this%states
-            write(*,*) "----------------------"
-        end if
+        if (this%run_physics) then
+            if (verbose) then
+                write(*,*) " State at beginning of RK4."
+                write(*,'(A,13ES20.12)') "y: ", this%states
+                write(*,*) "----------------------"
+            end if
 
-        if (this%run_physics) this%states = this%runge_kutta(this%states, dt)
+            this%states = this%runge_kutta(this%states, dt)
+            if (verbose) then
+                write(*,*) " State at end of RK4."
+                write(*,'(A,13ES20.12)') "y: ", this%states
+                write(*,*) "----------------------"
+            end if
+            call quat_norm(this%states(10:13))
+
+        end if
 
     end function aircraft_tick_states
 

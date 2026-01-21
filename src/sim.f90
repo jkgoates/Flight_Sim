@@ -86,14 +86,14 @@ contains
             !call vehicles(i)%print_aero_table(norm2(y(1:3)), -y(9))
         !end do
 
-        open(newunit=io_unit, file='sim_output.csv', status='replace', action='write')
-        write(io_unit,*) 'time[s], u[ft/s], v[ft/s], w[ft/s], p[rad/s], q[rad/s], r[rad/s], xf[ft], yf[ft], zf[ft], e0, ex, ey, ez'
-        write(io_unit,'(ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12, &
-                        A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12)') &
-                            t,',',y(1),',',y(2),',',y(3),',',y(4),',',y(5),',' &
-                            ,y(6),',',y(7),',',y(8),',',y(9),',',y(10),',',y(11),',',y(12),',',y(13)
+        !open(newunit=io_unit, file='sim_output.csv', status='replace', action='write')
+        !write(io_unit,*) 'time[s], u[ft/s], v[ft/s], w[ft/s], p[rad/s], q[rad/s], r[rad/s], xf[ft], yf[ft], zf[ft], e0, ex, ey, ez'
+        !write(io_unit,'(ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12, &
+                        !A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12)') &
+                            !t,',',y(1),',',y(2),',',y(3),',',y(4),',',y(5),',' &
+                            !,y(6),',',y(7),',',y(8),',',y(9),',',y(10),',',y(11),',',y(12),',',y(13)
 
-        call quat_norm(y(10:13))
+        !call quat_norm(y(10:13))
 
         ! Check for real time sim
         if (dt == 0.0) then
@@ -139,7 +139,6 @@ contains
                 write(*,*) "----------------------"
             end if
 
-            call quat_norm(y(10:13))
 
             write(io_unit,'(ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,&
                             ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12)') &
