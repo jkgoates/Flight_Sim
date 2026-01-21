@@ -11,16 +11,18 @@ module vehicle_m
     
     type :: aircraft
         
+        character(:), allocatable :: type
+        logical :: run_physics
         real :: M, Ixx, Iyy, Izz, Ixy, Iyz, Ixz ! Mass and Inertia matrix
         real, dimension(:), allocatable :: CG_shift ! CG shift from reference point (ft)
         real :: hx, hy, hz ! Gyroscopic components
         real :: T0, a ! Thrust parameters
-        real, dimension(:), allocatable :: t_location
+        real, dimension(:), allocatable :: t_location, t_orientation
         real :: S_w, b, c ! Reference area, span, chord
         real :: CL_0, CL_alpha, CL_alphahat, CL_qbar, CL_de ! Lift coefficients
         real :: CS_beta, CS_pbar, CS_alpha_pbar, CS_rbar, CS_da, CS_dr ! Side force coefficients
         real :: CD_L0, CD_CL1, CD_CL1_CL1, CD_CS_CS, CD_qbar, CD_alpha_qbar, CD_de, CD_alpha_de, CD_de_de ! Drag coefficients
-        real :: Cell_beta, Cell_pbar, Cell_alpha_rbar, Cell_rbar, Cell_da, Cell_dr ! Rolling moment coefficients
+        real :: Cell_0, Cell_1, Cell_beta, Cell_pbar, Cell_alpha_rbar, Cell_rbar, Cell_da, Cell_dr ! Rolling moment coefficients
         real :: Cm_0, Cm_alpha, Cm_qbar, Cm_alphahat, Cm_de ! Pitching moment coefficients
         real :: Cn_beta, Cn_pbar, Cn_alpha_pbar, Cn_rbar, Cn_da, Cn_alpha_da, Cn_dr ! Yawing moment coefficients
         ! real :: rho0
@@ -59,24 +61,31 @@ module vehicle_m
     
 contains
 
-    subroutine aircraft_init(this, settings, j_initial)
+    subroutine aircraft_init(this, settings)
     
         class(aircraft), intent(inout) :: this
-        type(json_value), pointer, intent(in) :: settings, j_initial
+        type(json_value), pointer, intent(in) :: settings
 
-        type(json_value), pointer :: reference, coefficients, aerodynamics, p1, p2
+        type(json_value), pointer :: reference, coefficients, aerodynamics, p1, p2, j_initial
         real, allocatable :: dummy_loc(:)
         integer :: N, cnt, i
         logical :: found
 
-        real :: V, H
+        real :: V, H, lat, long
+        real, allocatable :: Euler(:)
         character(len=:), allocatable :: init_type
 
         ! Parse JSON settings
+        call jsonx_get(settings, "initial", j_initial)
         call jsonx_get(settings, "aerodynamics", aerodynamics)
-        call jsonx_get(aerodynamics, "coefficients", coefficients)
         call jsonx_get(aerodynamics, "reference", reference)
 
+        call jsonx_get(settings, "run_physics", this%run_physics)
+        call jsonx_get(settings, "type", this%type)
+
+        if (this%type == "aircraft" .or. this%type == "arrow") then
+            call jsonx_get(aerodynamics, "coefficients", coefficients)
+        end if
         ! CG Shift
         !call jsonx_get(settings, "CG_shift[ft]", this%CG_shift, 0.0, 3)
 
@@ -96,62 +105,76 @@ contains
         call jsonx_get(settings, "thrust.T0[lbf]", this%T0, 0.0)
         call jsonx_get(settings, "thrust.a", this%a, 0.0)
         call jsonx_get(settings, "thrust.location[ft]", this%t_location, 0.0, 3)
+        call jsonx_get(settings, "thrust.orientation[deg]", this%t_orientation, 0.0, 3)
+        this%t_orientation = this%t_orientation*pi/180.0
 
         ! Reference properties
         call jsonx_get(reference, "area[ft^2]", this%S_w)
         call jsonx_get(reference, "longitudinal_length[ft]", this%c)
         call jsonx_get(reference, "lateral_length[ft]", this%b)
-        call jsonx_get(reference, "relative_location[ft]", this%CG_shift, 0.0, 3)
+        call jsonx_get(reference, "location[ft]", this%CG_shift, 0.0, 3)
 
-        ! Lift coefficients
-        call jsonx_get(coefficients, "CL.0", this%CL_0)
-        call jsonx_get(coefficients, "CL.alpha", this%CL_alpha)
-        call jsonx_get(coefficients, "CL.alphahat", this%CL_alphahat)
-        call jsonx_get(coefficients, "CL.qbar", this%CL_qbar)
-        call jsonx_get(coefficients, "CL.elevator", this%CL_de)
+        if (this%type == 'aircraft') then
+            ! Lift coefficients
+            call jsonx_get(coefficients, "CL.0", this%CL_0)
+            call jsonx_get(coefficients, "CL.alpha", this%CL_alpha)
+            call jsonx_get(coefficients, "CL.alphahat", this%CL_alphahat)
+            call jsonx_get(coefficients, "CL.qbar", this%CL_qbar)
+            call jsonx_get(coefficients, "CL.elevator", this%CL_de)
 
-        ! Side force coefficients
-        call jsonx_get(coefficients, "CS.beta", this%CS_beta)
-        call jsonx_get(coefficients, "CS.pbar", this%CS_pbar)
-        call jsonx_get(coefficients, "CS.alpha_pbar", this%CS_alpha_pbar)
-        call jsonx_get(coefficients, "CS.rbar", this%CS_rbar)
-        call jsonx_get(coefficients, "CS.aileron", this%CS_da)
-        call jsonx_get(coefficients, "CS.rudder", this%CS_dr)
+            ! Side force coefficients
+            call jsonx_get(coefficients, "CS.beta", this%CS_beta)
+            call jsonx_get(coefficients, "CS.pbar", this%CS_pbar)
+            call jsonx_get(coefficients, "CS.alpha_pbar", this%CS_alpha_pbar)
+            call jsonx_get(coefficients, "CS.rbar", this%CS_rbar)
+            call jsonx_get(coefficients, "CS.aileron", this%CS_da)
+            call jsonx_get(coefficients, "CS.rudder", this%CS_dr)
 
-        ! Drag Coefficients
-        call jsonx_get(coefficients, "CD.L0", this%CD_L0)
-        call jsonx_get(coefficients, "CD.CL1", this%CD_CL1)
-        call jsonx_get(coefficients, "CD.CL1_CL1", this%CD_CL1_CL1)
-        call jsonx_get(coefficients, "CD.CS_CS", this%CD_CS_CS)
-        call jsonx_get(coefficients, "CD.qbar", this%CD_qbar)
-        call jsonx_get(coefficients, "CD.alpha_qbar", this%CD_alpha_qbar)
-        call jsonx_get(coefficients, "CD.elevator", this%CD_de)
-        call jsonx_get(coefficients, "CD.alpha_elevator", this%CD_alpha_de)
-        call jsonx_get(coefficients, "CD.elevator_elevator", this%CD_de_de)
+            ! Drag Coefficients
+            call jsonx_get(coefficients, "CD.L0", this%CD_L0)
+            call jsonx_get(coefficients, "CD.CL1", this%CD_CL1)
+            call jsonx_get(coefficients, "CD.CL1_CL1", this%CD_CL1_CL1)
+            call jsonx_get(coefficients, "CD.CS_CS", this%CD_CS_CS)
+            call jsonx_get(coefficients, "CD.qbar", this%CD_qbar)
+            call jsonx_get(coefficients, "CD.alpha_qbar", this%CD_alpha_qbar)
+            call jsonx_get(coefficients, "CD.elevator", this%CD_de)
+            call jsonx_get(coefficients, "CD.alpha_elevator", this%CD_alpha_de)
+            call jsonx_get(coefficients, "CD.elevator_elevator", this%CD_de_de)
 
-        ! Rolling moment coefficients
-        call jsonx_get(coefficients, "Cl.beta", this%Cell_beta)
-        call jsonx_get(coefficients, "Cl.pbar", this%Cell_pbar)
-        call jsonx_get(coefficients, "Cl.alpha_rbar", this%Cell_alpha_rbar)
-        call jsonx_get(coefficients, "Cl.rbar", this%Cell_rbar)
-        call jsonx_get(coefficients, "Cl.aileron", this%Cell_da)
-        call jsonx_get(coefficients, "Cl.rudder", this%Cell_dr)
+            ! Rolling moment coefficients
+            call jsonx_get(coefficients, "Cl.beta", this%Cell_beta)
+            call jsonx_get(coefficients, "Cl.pbar", this%Cell_pbar)
+            call jsonx_get(coefficients, "Cl.alpha_rbar", this%Cell_alpha_rbar)
+            call jsonx_get(coefficients, "Cl.rbar", this%Cell_rbar)
+            call jsonx_get(coefficients, "Cl.aileron", this%Cell_da)
+            call jsonx_get(coefficients, "Cl.rudder", this%Cell_dr)
 
-        ! Pitching moment coefficients
-        call jsonx_get(coefficients, "Cm.0", this%Cm_0)
-        call jsonx_get(coefficients, "Cm.alpha", this%Cm_alpha)
-        call jsonx_get(coefficients, "Cm.qbar", this%Cm_qbar)
-        call jsonx_get(coefficients, "Cm.alphahat", this%Cm_alphahat)
-        call jsonx_get(coefficients, "Cm.elevator", this%Cm_de)
+            ! Pitching moment coefficients
+            call jsonx_get(coefficients, "Cm.0", this%Cm_0)
+            call jsonx_get(coefficients, "Cm.alpha", this%Cm_alpha)
+            call jsonx_get(coefficients, "Cm.qbar", this%Cm_qbar)
+            call jsonx_get(coefficients, "Cm.alphahat", this%Cm_alphahat)
+            call jsonx_get(coefficients, "Cm.elevator", this%Cm_de)
 
-        ! Yawing moment coefficients
-        call jsonx_get(coefficients, "Cn.beta", this%Cn_beta)
-        call jsonx_get(coefficients, "Cn.pbar", this%Cn_pbar)
-        call jsonx_get(coefficients, "Cn.alpha_pbar", this%Cn_alpha_pbar)
-        call jsonx_get(coefficients, "Cn.rbar", this%Cn_rbar)
-        call jsonx_get(coefficients, "Cn.aileron", this%Cn_da)
-        call jsonx_get(coefficients, "Cn.alpha_aileron", this%Cn_alpha_da)
-        call jsonx_get(coefficients, "Cn.rudder", this%Cn_dr)
+            ! Yawing moment coefficients
+            call jsonx_get(coefficients, "Cn.beta", this%Cn_beta)
+            call jsonx_get(coefficients, "Cn.pbar", this%Cn_pbar)
+            call jsonx_get(coefficients, "Cn.alpha_pbar", this%Cn_alpha_pbar)
+            call jsonx_get(coefficients, "Cn.rbar", this%Cn_rbar)
+            call jsonx_get(coefficients, "Cn.aileron", this%Cn_da)
+            call jsonx_get(coefficients, "Cn.alpha_aileron", this%Cn_alpha_da)
+            call jsonx_get(coefficients, "Cn.rudder", this%Cn_dr)
+        
+        else if (this%type == 'arrow') then
+
+            call jsonx_get(coefficients, "CL.alpha", this%CL_alpha)
+            call jsonx_get(coefficients, "CD.L0", this%CD_L0)
+            call jsonx_get(coefficients, "CD.CL1_CL1", this%CD_CL1_CL1)
+            call jsonx_get(coefficients, "Cl.0", this%Cell_0)
+            call jsonx_get(coefficients, "Cl.pbar", this%Cell_pbar)
+            call jsonx_get(coefficients, "Cm.alpha", this%Cm_alpha)
+            call jsonx_get(coefficients, "Cm.qbar", this%Cm_qbar)
+        end if
 
 
         ! Stall
@@ -177,60 +200,63 @@ contains
             this%Cm_stall%alpha_s = this%Cm_stall%alpha_s*pi/180.
         end if
 
-        ! Landing Gear
-        call jsonx_get(settings, "landing_gear", p1)
-        N = json_value_count(p1)
-        cnt= 0
-        do i = 1, N
-            call json_value_get(p1, i, p2)
-            if (p2%name(1:1) == 'x') cycle
-            cnt = cnt+1
-        end do
-        allocate(this%ks(cnt))
-        allocate(this%kd(cnt))
-        allocate(this%g_b(cnt, 3))
-        cnt = 1
-        do i = 1, N
-            call json_value_get(p1, i, p2)
-            if (p2%name(1:1) == 'x') cycle
-            call jsonx_get(p2, "location[ft]", dummy_loc, 0.0, 3)
-            this%g_b(cnt, :) = dummy_loc
-            call jsonx_get(p2, "spring_constant[lb/ft]", this%ks(cnt))
-            call jsonx_get(p2, "damping_constant[lb-s/ft]", this%kd(cnt))
-            cnt = cnt+1
-        end do
+        !! Landing Gear
+        !call jsonx_get(settings, "landing_gear", p1)
+        !N = json_value_count(p1)
+        !cnt= 0
+        !do i = 1, N
+            !call json_value_get(p1, i, p2)
+            !if (p2%name(1:1) == 'x') cycle
+            !cnt = cnt+1
+        !end do
+        !allocate(this%ks(cnt))
+        !allocate(this%kd(cnt))
+        !allocate(this%g_b(cnt, 3))
+        !cnt = 1
+        !do i = 1, N
+            !call json_value_get(p1, i, p2)
+            !if (p2%name(1:1) == 'x') cycle
+            !call jsonx_get(p2, "location[ft]", dummy_loc, 0.0, 3)
+            !this%g_b(cnt, :) = dummy_loc
+            !call jsonx_get(p2, "spring_constant[lb/ft]", this%ks(cnt))
+            !call jsonx_get(p2, "damping_constant[lb-s/ft]", this%kd(cnt))
+            !cnt = cnt+1
+        !end do
 
-        ! Collision points
-        call jsonx_get(settings, "collision_points", p1)
-        N = json_value_count(p1)
-        cnt = 0
-        do i = 1, N
-            call json_value_get(p1, i, p2)
-            if (p2%name(1:1) == 'x') cycle
-            cnt = cnt+1
-        end do
-        allocate(this%collision_points(cnt,3))
-        cnt = 1
-        do i = 1, N
-            call json_value_get(p1, i, p2)
-            if (p2%name(1:1) == 'x') cycle
-            call jsonx_get(p1, p2%name, dummy_loc, 0.0, 3)
-            this%collision_points(cnt, :) = dummy_loc
-            cnt = cnt+1
-        end do
+        !! Collision points
+        !call jsonx_get(settings, "collision_points", p1)
+        !N = json_value_count(p1)
+        !cnt = 0
+        !do i = 1, N
+            !call json_value_get(p1, i, p2)
+            !if (p2%name(1:1) == 'x') cycle
+            !cnt = cnt+1
+        !end do
+        !allocate(this%collision_points(cnt,3))
+        !cnt = 1
+        !do i = 1, N
+            !call json_value_get(p1, i, p2)
+            !if (p2%name(1:1) == 'x') cycle
+            !call jsonx_get(p1, p2%name, dummy_loc, 0.0, 3)
+            !this%collision_points(cnt, :) = dummy_loc
+            !cnt = cnt+1
+        !end do
 
-        ! Arrestor Gear
-        call jsonx_get(settings, "arresting_gear", p1)
-        call jsonx_get(p1, "spring_constant[lb/ft]", this%ag_ks)
-        call jsonx_get(p1, "damping_constant[lb-s/ft]", this%ag_kd)
-        call jsonx_get(p1, "cable_length[ft]", this%ag_length)
-        call jsonx_get(p1, "cable_distance[ft]", this%ag_distance)
-        call jsonx_get(p1, "tail_hook[ft]", this%th_b)
-        this%ag_engaged = .false.
+        !! Arrestor Gear
+        !call jsonx_get(settings, "arresting_gear", p1)
+        !call jsonx_get(p1, "spring_constant[lb/ft]", this%ag_ks)
+        !call jsonx_get(p1, "damping_constant[lb-s/ft]", this%ag_kd)
+        !call jsonx_get(p1, "cable_length[ft]", this%ag_length)
+        !call jsonx_get(p1, "cable_distance[ft]", this%ag_distance)
+        !call jsonx_get(p1, "tail_hook[ft]", this%th_b)
+        !this%ag_engaged = .false.
 
         ! State
         call jsonx_get(j_initial, "airspeed[ft/s]", V)
         call jsonx_get(j_initial, "altitude[ft]", H)
+        call jsonx_get(j_initial, "latitude[deg]", lat)
+        call jsonx_get(j_initial, "longitude[deg]", long)
+        call jsonx_get(j_initial, "Euler_angles[deg]", euler)
 
         ! Get type of initialization
         call jsonx_get(j_initial, "type", init_type)
@@ -238,7 +264,7 @@ contains
 
         select case(init_type)
         case("state")
-            call this%init_to_state(j_initial, V,H)
+            call this%init_to_state(j_initial, V,H, Euler)
         case("trim")
             call this%init_to_trim(j_initial, V,H)
         case default
@@ -248,39 +274,34 @@ contains
 
     end subroutine aircraft_init
 
-    subroutine aircraft_init_to_state(this, j_initial, V_mag, H)
+    subroutine aircraft_init_to_state(this, j_initial, V_mag, H, Euler)
         implicit none
         
         class(aircraft), intent(inout) :: this
         type(json_value), pointer, intent(in) :: j_initial
-        real, intent(inout) :: V_mag, H
+        real, intent(inout) :: V_mag, H, Euler(3)
 
         real :: alpha, beta, p, q, r, da, de, dr, throttle, phi, theta, psi, xf, yf, zf
         
-        call jsonx_get(j_initial, "state.alpha[deg]", alpha, default_value=0.0)
-        call jsonx_get(j_initial, "state.beta[deg]", beta, default_value=0.0)
+        call jsonx_get(j_initial, "state.angle_of_attack[deg]", alpha, default_value=0.0)
+        call jsonx_get(j_initial, "state.sideslip_angle[deg]", beta, default_value=0.0)
         call jsonx_get(j_initial, "state.p[deg/s]", p, default_value=0.0)
         call jsonx_get(j_initial, "state.q[deg/s]", q, default_value=0.0)
         call jsonx_get(j_initial, "state.r[deg/s]", r, default_value =0.0)
-        call jsonx_get(j_initial, "state.xf[ft]", xf, default_value=0.0)
-        call jsonx_get(j_initial, "state.yf[ft]", yf, default_value=0.0)
-        call jsonx_get(j_initial, "state.zf[ft]", zf, default_value =0.0)
         call jsonx_get(j_initial, "state.aileron[deg]", da, default_value=0.0)
         call jsonx_get(j_initial, "state.elevator[deg]", de, default_value=0.0)
         call jsonx_get(j_initial, "state.rudder[deg]", dr, default_value=0.0)
         call jsonx_get(j_initial, "state.throttle", throttle, default_value=0.0)
-        call jsonx_get(j_initial, "state.phi[deg]", phi, default_value=0.0)
-        call jsonx_get(j_initial, "state.theta[deg]", theta, default_value=0.0)
-        call jsonx_get(j_initial, "state.psi[deg]", psi, default_value=0.0)
 
         this%controls(1) = da*PI/180.
         this%controls(2) = de*PI/180.
         this%controls(3) = dr*PI/180.
         this%controls(4) = throttle
 
-        phi = phi*PI/180.
-        theta = theta*PI/180.
-        psi = psi*PI/180.
+        Euler = Euler*PI/180.
+        !phi = phi*PI/180.
+        !theta = theta*PI/180.
+        !psi = psi*PI/180.
 
         ! Set initial conditions
         alpha = alpha *PI/180.
@@ -301,7 +322,9 @@ contains
         this%states(8) = yf
         this%states(9) = -H
 
-        this%states(10:13) = euler_to_quat((/phi, theta, psi/))
+        this%states(10:13) = euler_to_quat(Euler)
+
+        write(*,*) "INITIAL STATES", this%states
 
     end subroutine aircraft_init_to_state
 
@@ -646,7 +669,7 @@ contains
         real, intent(in) :: y(13)
         real :: dy_dt(13)
 
-        real :: mass, I(3,3), F(3), M(3), g, I_inv(3,3), dummy(3), h(3)
+        real :: mass, I(3,3), F(3), M(3), g, I_inv(3,3), dummy(3), h(3), a_c
 
         if (verbose) then
             write(*,'(A,13ES20.12)') "y: ", y
@@ -654,19 +677,24 @@ contains
 
         g = gravity_English(-y(9))
 
+
         call this%mass_inertia(y, mass, I)
         call this%pseudo_aero(y, F, M)
         call this%gyroscopic(y, h)
 
         dy_dt = 0.0
 
+        ! Eq. 5.4.7
+        dy_dt(7:9) = quat_dependent_to_base(y(1:3), y(10:13))
+
+        ! Gravity relief
+        a_c = (dy_dt(7)**2 + dy_dt(8)**2)/((r_e/0.3048) -y(9))
+
         ! Sim of Flight Eq. 5.4.5
-        
         dy_dt(1:3) = (1.0/mass)*F
-        dy_dt(1) = dy_dt(1) + g*(2*(y(11)*y(13) - y(12)*y(10))) + (y(6)*y(2) - y(5)*y(3))
-        dy_dt(2) = dy_dt(2) + g*(2*(y(12)*y(13) + y(11)*y(10))) + (y(4)*y(3) - y(6)*y(1))
-        !dy_dt(3) = dy_dt(3) + g*(y(13)**2 + y(10)**2 - y(11)**2 - y(12)**2) + (y(5)*y(1) - y(4)*y(2))
-        dy_dt(3) = dy_dt(3) + g*(y(13)*y(13) + y(10)*y(10) - y(11)*y(11) - y(12)*y(12)) + (y(5)*y(1) - y(4)*y(2))
+        dy_dt(1) = dy_dt(1) + (g-a_c)*(2*(y(11)*y(13) - y(12)*y(10))) + (y(6)*y(2) - y(5)*y(3))
+        dy_dt(2) = dy_dt(2) + (g-a_c)*(2*(y(12)*y(13) + y(11)*y(10))) + (y(4)*y(3) - y(6)*y(1))
+        dy_dt(3) = dy_dt(3) + (g-a_c)*(y(13)*y(13) + y(10)*y(10) - y(11)*y(11) - y(12)*y(12)) + (y(5)*y(1) - y(4)*y(2))
 
         ! Calculate I_inv
         I_inv(1,1) = I(2,2)*I(3,3) - I(2,3)*I(3,2)
@@ -691,9 +719,6 @@ contains
         dummy(3) = dummy(3) + (I(1,1) - I(2,2))*y(4)*y(5) - I(1,2)*(y(4)**2 - y(5)**2) - I(2,3)*y(4)*y(6) + I(1,3)*y(5)*y(6)
         dy_dt(4:6) = matmul(I_inv, dummy)
 
-
-        ! Eq. 5.4.7
-        dy_dt(7:9) = quat_dependent_to_base(y(1:3), y(10:13))
 
 
         ! Eq. 5.4.8
@@ -904,7 +929,7 @@ contains
         real, intent(in) :: y(13)
         real, intent(out) :: F(3), M(3)
 
-        real :: Z, Temp, P, rho, a
+        real :: Z, Temp, P, rho, a, mu, Re
         real :: C_L1, C_L, C_D, C_S, C_ell, C_m, C_n
         real :: de, da, dr, throttle
 
@@ -936,54 +961,104 @@ contains
         ! Flank angle
         !beta = atan2(y(2),y(1))
 
-        ! Calculate aerodynamic coefficients
-        C_L1 = this%CL_0 + this%CL_alpha*alpha
-        C_L = C_L1 + this%CL_qbar*qbar + this%CL_alphahat*alphahat + this%CL_de*de
-        C_S = this%CS_beta*beta + (this%CS_pbar + this%CS_alpha_pbar*alpha)*pbar &
-                + this%CS_rbar*rbar + this%CS_da*da + this%CS_dr*dr
-        C_D = this%CD_L0 + this%CD_CL1*C_L1 + this%CD_CL1_CL1*(C_L1**2) + this%CD_CS_CS*C_S**2 &
-                + (this%CD_qbar + this%CD_alpha_qbar*alpha)*qbar + this%CD_de*de + this%CD_alpha_de*alpha*de + this%CD_de_de*de**2
-        C_ell = this%Cell_beta*beta + this%Cell_pbar*pbar + this%Cell_alpha_rbar*alpha*rbar + this%Cell_rbar*rbar &
-                + this%Cell_da*da + this%Cell_dr*dr
-        C_m = this%Cm_0 + this%Cm_alpha*alpha + this%Cm_qbar*qbar + this%Cm_alphahat*alphahat + this%Cm_de*de
-        C_n = this%Cn_beta*beta + this%Cn_pbar*pbar + this%Cn_alpha_pbar*alpha*pbar + this%Cn_rbar*rbar &
-                + this%Cn_da*da + this%Cn_alpha_da*alpha*da + this%Cn_dr*dr
+        if (this%type == 'aircraft') then
+            ! Calculate aerodynamic coefficients
+            C_L1 = this%CL_0 + this%CL_alpha*alpha
+            C_L = C_L1 + this%CL_qbar*qbar + this%CL_alphahat*alphahat + this%CL_de*de
+            C_S = this%CS_beta*beta + (this%CS_pbar + this%CS_alpha_pbar*alpha)*pbar &
+                    + this%CS_rbar*rbar + this%CS_da*da + this%CS_dr*dr
+            C_D = this%CD_L0 + this%CD_CL1*C_L1 + this%CD_CL1_CL1*(C_L1**2) + this%CD_CS_CS*C_S**2 &
+                    + (this%CD_qbar + this%CD_alpha_qbar*alpha)*qbar + this%CD_de*de + this%CD_alpha_de*alpha*de + this%CD_de_de*de**2
+            C_ell = this%Cell_beta*beta + this%Cell_pbar*pbar + this%Cell_alpha_rbar*alpha*rbar + this%Cell_rbar*rbar &
+                    + this%Cell_da*da + this%Cell_dr*dr
+            C_m = this%Cm_0 + this%Cm_alpha*alpha + this%Cm_qbar*qbar + this%Cm_alphahat*alphahat + this%Cm_de*de
+            C_n = this%Cn_beta*beta + this%Cn_pbar*pbar + this%Cn_alpha_pbar*alpha*pbar + this%Cn_rbar*rbar &
+                    + this%Cn_da*da + this%Cn_alpha_da*alpha*da + this%Cn_dr*dr
 
-        S_alpha = sin(alpha)
-        C_alpha = cos(alpha)
-        S_beta = sin(beta)
-        C_beta = cos(beta)
+            S_alpha = sin(alpha)
+            C_alpha = cos(alpha)
+            S_beta = sin(beta)
+            C_beta = cos(beta)
 
-        if (this%include_stall) then
-            ! Compute stall CL
-            CLnewt  = 2.0*sign(1.0,alpha)*S_alpha*S_alpha*C_alpha
-            pos = exp( this%CL_stall%lambda_b*(alpha - this%CL_stall%alpha_0 + this%CL_stall%alpha_s))
-            neg = exp(-this%CL_stall%lambda_b*(alpha - this%CL_stall%alpha_0 - this%CL_stall%alpha_s))
-            sigma = (1.0 + neg + pos)/((1.0 + neg)*(1.0 + pos))
-            C_L = (1.0 - sigma)*C_L + sigma*(CLnewt)
+            if (this%include_stall) then
+                ! Compute stall CL
+                CLnewt  = 2.0*sign(1.0,alpha)*S_alpha*S_alpha*C_alpha
+                pos = exp( this%CL_stall%lambda_b*(alpha - this%CL_stall%alpha_0 + this%CL_stall%alpha_s))
+                neg = exp(-this%CL_stall%lambda_b*(alpha - this%CL_stall%alpha_0 - this%CL_stall%alpha_s))
+                sigma = (1.0 + neg + pos)/((1.0 + neg)*(1.0 + pos))
+                C_L = (1.0 - sigma)*C_L + sigma*(CLnewt)
         
-            ! Compute stall CD
-            CDnewt  = 2.0*sin(abs(alpha))**3
-            pos = exp( this%CD_stall%lambda_b*(alpha - this%CD_stall%alpha_0 + this%CD_stall%alpha_s))
-            neg = exp(-this%CD_stall%lambda_b*(alpha - this%CD_stall%alpha_0 - this%CD_stall%alpha_s))
-            sigma = (1.0 + neg + pos)/((1.0 + neg)*(1.0 + pos))
-            C_D = (1.0 - sigma)*C_D + sigma*(CDnewt)
+                ! Compute stall CD
+                CDnewt  = 2.0*sin(abs(alpha))**3
+                pos = exp( this%CD_stall%lambda_b*(alpha - this%CD_stall%alpha_0 + this%CD_stall%alpha_s))
+                neg = exp(-this%CD_stall%lambda_b*(alpha - this%CD_stall%alpha_0 - this%CD_stall%alpha_s))
+                sigma = (1.0 + neg + pos)/((1.0 + neg)*(1.0 + pos))
+                C_D = (1.0 - sigma)*C_D + sigma*(CDnewt)
 
-            ! Compute stall Cm
-            Cmnewt  = this%Cm_stall%minval*sign(1.0,alpha)*S_alpha*S_alpha
-            pos = exp( this%Cm_stall%lambda_b*(alpha - this%Cm_stall%alpha_0 + this%Cm_stall%alpha_s))
-            neg = exp(-this%Cm_stall%lambda_b*(alpha - this%Cm_stall%alpha_0 - this%Cm_stall%alpha_s))
-            sigma = (1.0 + neg + pos)/((1.0 + neg)*(1.0 + pos))
-            C_m = (1.0 - sigma)*C_m + sigma*(Cmnewt)
+                ! Compute stall Cm
+                Cmnewt  = this%Cm_stall%minval*sign(1.0,alpha)*S_alpha*S_alpha
+                pos = exp( this%Cm_stall%lambda_b*(alpha - this%Cm_stall%alpha_0 + this%Cm_stall%alpha_s))
+                neg = exp(-this%Cm_stall%lambda_b*(alpha - this%Cm_stall%alpha_0 - this%Cm_stall%alpha_s))
+                sigma = (1.0 + neg + pos)/((1.0 + neg)*(1.0 + pos))
+                C_m = (1.0 - sigma)*C_m + sigma*(Cmnewt)
+            end if
+
+            F(1) = 0.5*rho*V**2 * this%S_w * (C_L*S_alpha - C_S*C_alpha*S_beta - C_D*C_alpha*C_beta)
+            F(2) = 0.5*rho*V**2 * this%S_w * (C_S*C_beta - C_D*S_beta)
+            F(3) = 0.5*rho*V**2 * this%S_w * (-C_L*C_alpha - C_S*S_alpha*S_beta - C_D*S_alpha*C_beta)
+
+            M(1) = 0.5*rho*V**2 * this%S_w * (this%b*(C_ell))
+            M(2) = 0.5*rho*V**2 * this%S_w * (this%c*C_m)
+            M(3) = 0.5*rho*V**2 * this%S_w * (this%b*(C_n))
+
+        else if (this%type == 'arrow') then
+
+            beta = atan2(y(2),y(1))
+
+            C_L = this%CL_alpha*alpha
+            C_S = -this%CL_alpha*beta
+            C_D = this%CD_L0 + this%CD_CL1_CL1*C_L**2 + this%CD_CL1_CL1*C_S**2
+            
+            C_ell = this%Cell_0 + this%Cell_pbar*pbar
+            C_m = this%Cm_alpha*alpha + this%Cm_qbar*qbar
+            C_n = -this%Cm_alpha*beta + this%Cm_qbar*rbar
+
+            beta = asin(y(2)/V)
+            S_alpha = sin(alpha)
+            C_alpha = cos(alpha)
+            S_beta = sin(beta)
+            C_beta = cos(beta)
+
+            F(1) = 0.5*rho*V**2 * this%S_w * (C_L*S_alpha - C_S*C_alpha*S_beta - C_D*C_alpha*C_beta)
+            F(2) = 0.5*rho*V**2 * this%S_w * (C_S*C_beta - C_D*S_beta)
+            F(3) = 0.5*rho*V**2 * this%S_w * (-C_L*C_alpha - C_S*S_alpha*S_beta - C_D*S_alpha*C_beta)
+
+            M(1) = 0.5*rho*V**2 * this%S_w * (this%b*(C_ell))
+            M(2) = 0.5*rho*V**2 * this%S_w * (this%c*C_m)
+            M(3) = 0.5*rho*V**2 * this%S_w * (this%b*(C_n))
+
+        else if (this%type == 'sphere') then
+            mu = sutherland_visc_English(temp)
+
+            Re = 2.0*rho*norm2(y(1:3))*this%b/mu
+
+            if (Re < 0.01) then
+                C_D = 2405.0
+            else if (Re >= 0.01 .and. Re <= 450000.) then
+                C_D = 24.0/Re + 6.0/(1.0+sqrt(Re)) + 0.4
+            else if (Re > 450000. .and. Re <= 560000) then
+                C_D = 1.0e29*Re**(-5.211)
+            else if (Re > 560000. .and. Re <= 14000000.) then
+                C_D = -2.0e-23*Re**3 - 1.e-16*Re**2 + 9.0e-9*Re + 0.069
+            else
+                C_D = 0.12
+            end if
+
+
+            F = -0.5 * rho * V**2 * PI * this%b**2 * C_D * y(1:3)/V
+            M = 0.0
+
         end if
-
-        F(1) = 0.5*rho*V**2 * this%S_w * (C_L*S_alpha - C_S*C_alpha*S_beta - C_D*C_alpha*C_beta)
-        F(2) = 0.5*rho*V**2 * this%S_w * (C_S*C_beta - C_D*S_beta)
-        F(3) = 0.5*rho*V**2 * this%S_w * (-C_L*C_alpha - C_S*S_alpha*S_beta - C_D*S_alpha*C_beta)
-
-        M(1) = 0.5*rho*V**2 * this%S_w * (this%b*(C_ell))
-        M(2) = 0.5*rho*V**2 * this%S_w * (this%c*C_m)
-        M(3) = 0.5*rho*V**2 * this%S_w * (this%b*(C_n))
 
         ! Apply CG shift to moments
         M(1) = M(1) + (this%CG_shift(2)*F(3) - this%CG_shift(3)*F(2))
@@ -1022,7 +1097,12 @@ contains
         real :: new_states(13)
 
 
-        new_states = this%runge_kutta(this%states, dt)
+        if (verbose) then
+            write(*,*) this%states
+            write(*,*) "----------------------"
+        end if
+
+        if (this%run_physics) this%states = this%runge_kutta(this%states, dt)
 
     end function aircraft_tick_states
 

@@ -7,7 +7,7 @@ module sim_m
 
     implicit none
     
-    type(aircraft) :: vehicle
+    type(aircraft), dimension(:), allocatable :: vehicles
 
     type(json_value), pointer :: j_main
 
@@ -25,21 +25,17 @@ contains
         implicit none
         
         character(len=100), intent(in) :: filename
-        type(json_value), pointer :: j_aircraft, j_initial
+        type(json_value), pointer :: j_aircraft, j_initial, p1, p2
         real, dimension(:), allocatable :: euler
         real :: alpha, beta, p, q, r
         real :: da, de, dr, throttle
+        integer :: N, cnt, i
 
         ! Load JSON file
         call jsonx_load(filename, j_main)
 
-        ! Initialize vehicle
-        call jsonx_get(j_main, "vehicle", j_aircraft)
-        call jsonx_get(j_main, "initial", j_initial)
-
-
-        ! Initialize vehicle
-        call jsonx_get(settings, "landing_gear", p1)
+        ! Initialize vehicles
+        call jsonx_get(j_main, "vehicles", p1)
         N = json_value_count(p1)
         cnt= 0
         do i = 1, N
@@ -47,20 +43,14 @@ contains
             if (p2%name(1:1) == 'x') cycle
             cnt = cnt+1
         end do
-        allocate(this%ks(cnt))
-        allocate(this%kd(cnt))
-        allocate(this%g_b(cnt, 3))
+        allocate(vehicles(cnt))
         cnt = 1
         do i = 1, N
             call json_value_get(p1, i, p2)
             if (p2%name(1:1) == 'x') cycle
-            call jsonx_get(p2, "location[ft]", dummy_loc, 0.0, 3)
-            this%g_b(cnt, :) = dummy_loc
-            call jsonx_get(p2, "spring_constant[lb/ft]", this%ks(cnt))
-            call jsonx_get(p2, "damping_constant[lb-s/ft]", this%kd(cnt))
+            call vehicles(i)%init(p2)
             cnt = cnt+1
         end do
-        call vehicle%init(j_aircraft, j_initial)
 
         call jsonx_get(j_main, "simulation.rk4_verbose", verbose, default_value=.false.)
         call jsonx_get(j_main, "simulation.save_states", save_states, default_value=.false.)
@@ -74,7 +64,7 @@ contains
         implicit none
 
         real :: t, y(13), y_temp(13)
-        integer :: io_unit
+        integer :: io_unit, i
         real :: dt, tf
         logical :: t_R, crashed
         real :: t_p, t_c, start_time, end_time
@@ -92,7 +82,9 @@ contains
         !call controls_conn%init(j_controls, 4)
 
 
-        call vehicle%print_aero_table(norm2(y(1:3)), -y(9))
+        !do i = 1, size(vehicles)
+            !call vehicles(i)%print_aero_table(norm2(y(1:3)), -y(9))
+        !end do
 
         open(newunit=io_unit, file='sim_output.csv', status='replace', action='write')
         write(io_unit,*) 'time[s], u[ft/s], v[ft/s], w[ft/s], p[rad/s], q[rad/s], r[rad/s], xf[ft], yf[ft], zf[ft], e0, ex, ey, ez'
@@ -113,7 +105,9 @@ contains
         if (t_R) then
             y_temp = y
             t_p = get_time()
-            y = vehicle%tick_states(dt)
+            do i = 1, size(vehicles)
+                y = vehicles(i)%tick_states(dt)
+            end do
             t_c = get_time()
             dt = t_c - t_p
             y = y_temp
@@ -128,11 +122,11 @@ contains
 
             if (verbose) then
                 write(*,*) "time: ", t, " s"
-                write(*,*) y
-                write(*,*) "----------------------"
             end if
 
-            y = vehicle%tick_states(dt)
+            do i = 1, size(vehicles)
+                y = vehicles(i)%tick_states(dt)
+            end do
             !y = runge_kutta(t, y, dt)
             t = t + dt
             if (t_R) then

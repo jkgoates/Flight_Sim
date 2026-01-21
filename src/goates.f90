@@ -8,6 +8,7 @@ module goates_m
     real,parameter :: PI4 = PI*0.25
     real,parameter :: g_ssl = 9.80665 ! Standard Gravity at sea level 
     real,parameter :: r_ez = 6356766.0 ! US standard atmosphere earth radius in meters
+    real,parameter :: r_e = 6366707.01949371 ! US standard atmosphere earth radius in meters
     real,parameter :: R_gas = 287.0528
     real,parameter :: gamma = 1.4
     real,parameter :: P_ssl = 101325.0 ! Standard Sea Level Pressure in N/m^2

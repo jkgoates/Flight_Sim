@@ -36,7 +36,7 @@ contains
         real, intent(in) :: t, y(13)
         real :: dy_dt(13)
 
-        real :: mass, I(3,3), F(3), M(3), g, I_inv(3,3), dummy(3)
+        real :: mass, I(3,3), F(3), M(3), g, I_inv(3,3), dummy(3), a_c
 
         g = gravity_English(-y(9))
 
@@ -46,13 +46,18 @@ contains
         dy_dt = 0.0
 
         ! Sim of Flight Eq. 5.4.5
+        ! Eq. 5.4.7
+        dy_dt(7:9) = quat_dependent_to_base(y(1:3), y(10:13))
+
+        ! Gravity relief
+        a_c = (dy_dt(7)**2 + dy_dt(8)**2)/((r_e/0.3048) -y(9))
         
         dy_dt(1:3) = (1.0/mass)*F
         !write(*,*) "F: ", F
         !write(*,*) "dy_dt: ", dy_dt
-        dy_dt(1) = dy_dt(1) + g*(2*(y(11)*y(13) - y(12)*y(10))) + (y(6)*y(2) - y(5)*y(3))
-        dy_dt(2) = dy_dt(2) + g*(2*(y(12)*y(13) + y(11)*y(10))) + (y(4)*y(3) - y(6)*y(1))
-        dy_dt(3) = dy_dt(3) + g*(y(13)**2 + y(10)**2 - y(11)**2 - y(12)**2) + (y(5)*y(1) - y(4)*y(2))
+        dy_dt(1) = dy_dt(1) + (g-a_c)*(2*(y(11)*y(13) - y(12)*y(10))) + (y(6)*y(2) - y(5)*y(3))
+        dy_dt(2) = dy_dt(2) + (g-a_c)*(2*(y(12)*y(13) + y(11)*y(10))) + (y(4)*y(3) - y(6)*y(1))
+        dy_dt(3) = dy_dt(3) + (g-a_c)*(y(13)**2 + y(10)**2 - y(11)**2 - y(12)**2) + (y(5)*y(1) - y(4)*y(2))
         !write(*,*) "dy_dt: ", dy_dt
 
         ! Calculate I_inv
@@ -75,8 +80,6 @@ contains
         dummy(3) = M(3)
         dy_dt(4:6) = matmul(I_inv, dummy)
 
-        ! Eq. 5.4.7
-        dy_dt(7:9) = quat_dependent_to_base(y(1:3), y(10:13))
 
         ! Eq. 5.4.8
         dy_dt(10) = 0.5*(- y(11)*y(4) - y(12)*y(5) - y(13)*y(6))
@@ -116,7 +119,7 @@ contains
         C_mqbar = -9.06
         C_ellpbar = -5.378
         ! Straight Fletchings
-        C_ell0 = 0.0
+        C_ell0 = 3.223
 
         S_w = 0.000218 ![ft^2]
         b = 2.3 ![ft]

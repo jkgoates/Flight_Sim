@@ -1,6 +1,6 @@
 {
     "simulation": {
-        "time_step[s]": 0.01
+        "time_step[s]": 0.005
     },
     "initial": {
         "airspeed[ft/s]": 210,
