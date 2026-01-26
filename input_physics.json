@@ -1,14 +1,14 @@
 {
     "simulation" : {
-        "time_step[s]" : 0.005,
-        "end_time[s]" : 1.345,
+        "time_step[s]" : 0.01,
+        "end_time[s]" : 30.0,
         "rk4_verbose" : true,
         "save_states" : true
     },
     "vehicles" : {
         "ping-pong-ball" : {
             "type" : "sphere",
-            "run_physics" : false,
+            "run_physics" : true,
             "mass" : {
                 "weight[lbf]" : 0.006,
                 "Ixx[slug-ft^2]" : 5.215657263284e-7,
@@ -95,7 +95,7 @@
         },
         "F16" : {
             "type" : "aircraft",
-            "run_physics" : false,
+            "run_physics" : true,
             "mass" : {
                 "weight[lbf]" : 20500.0,
                 "Ixx[slug-ft^2]" : 9496.0,
@@ -117,7 +117,7 @@
                     "area[ft^2]" : 300.0,
                     "longitudinal_length[ft]" : 11.32,
                     "lateral_length[ft]" : 30.0,
-                    "location[ft]" : [0.0, 0.0, 0.0]
+                    "location[ft]" : [-1.0, 0.0, 0.0]
                 },
                 "stall" : {
                     "include_stall" : false,
@@ -196,18 +196,42 @@
                 "altitude[ft]" : 1000.0,
                 "latitude[deg]" : 0.0,
                 "longitude[deg]" : 0.0,
-                "Euler_angles[deg]" : [0.0, 7.857407446414, 0.0],
+                "Euler_angles[deg]" : [45.0, 8.042590225317, 0.0],
+                "xEuler_angles[deg]" : [0.0, 8.442080225436, 0.0],
+                "xxEuler_angles[deg]" : [0.0, 0.0, 0.0],
                 "type" : "state",
                 "state" : {
-                    "angle_of_attack[deg]" : 7.857407446414,
+                    "angle_of_attack[deg]" : 11.278107537468,
+                    "sideslip_angle[deg]" : 0.022727214169,
+                    "p[deg/s]" : -0.766207504385,
+                    "q[deg/s]" : 3.834356702909,
+                    "r[deg/s]" : 3.834356702909,
+                    "aileron[deg]" : 0.123007387668,
+                    "elevator[deg]" : -11.389397552606,
+                    "rudder[deg]" : -0.871269845919,
+                    "throttle" : 0.129524457808
+                },
+                "xstate" : {
+                    "angle_of_attack[deg]" : 8.442080225436,
                     "sideslip_angle[deg]" : 0.0,
                     "p[deg/s]" : 0.0,
                     "q[deg/s]" : 0.0,
                     "r[deg/s]" : 0.0,
                     "aileron[deg]" : 0.0,
-                    "elevator[deg]" : -4.940949432344,
+                    "elevator[deg]" : -9.439213266902,
                     "rudder[deg]" : 0.0,
-                    "throttle" : 0.067931173301
+                    "throttle" : 0.074041048286
+                },
+                "xxstate" : {
+                    "angle_of_attack[deg]" : 0.0,
+                    "sideslip_angle[deg]" : 0.0,
+                    "p[deg/s]" : 0.0,
+                    "q[deg/s]" : 0.0,
+                    "r[deg/s]" : 0.0,
+                    "aileron[deg]" : 0.0,
+                    "elevator[deg]" : -25.0,
+                    "rudder[deg]" : 0.0,
+                    "throttle" : 0.4
                 },
                 "trim" : {
                     "type" : "sct",
