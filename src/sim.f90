@@ -30,6 +30,7 @@ contains
         real :: alpha, beta, p, q, r
         real :: da, de, dr, throttle
         integer :: N, cnt, i
+        real :: x(2)
 
         ! Load JSON file
         call jsonx_load(filename, j_main)
@@ -56,6 +57,10 @@ contains
         call jsonx_get(j_main, "simulation.save_states", save_states, default_value=.false.)
 
         call udp_initialize()         ! for windows users
+
+        x = newtons_method(2, (/0.0, 0.0/), 0.01, 1.0, 1.0e-12)
+
+        write(*,*) "SOLVED FOR X: ", x
         
     end subroutine init
 

@@ -595,13 +595,100 @@ contains
         this%states(10:13) = euler_to_quat((/phi, theta, psi/))
     end subroutine aircraft_init_to_trim
 
-    subroutine newtons_method(this, func, x, delta, gamma)
+    function newtons_method (N, x, delta, gamma, tol) result(temp_x)
+
+        implicit none
+        
+        integer, intent(in) :: N
+        real, intent(in) :: x(N), delta, gamma, tol
+
+        real :: R(N), R1(N), R2(N), J(N,N), temp_x(N), err
+        real, allocatable :: dx(:)
+        integer :: i, k
+
+        temp_x = x
+
+        R = calc_R_demo(N,temp_x)
+        err = maxval(abs(R))
+
+        do while (err > tol)
+
+            do k = 1, N
+                temp_x(k) = temp_x(k) + delta
+                R1 = calc_R_demo(N,temp_x)
+                temp_x(k) = temp_x(k) - 2*delta
+                R2 = calc_R_demo(N,temp_x)
+                do i = 1, N
+                    J(i,k) = (R1(i) - R2(i))/(2*delta)
+                end do
+                temp_x(k) = temp_x(k) + delta
+            end do
+            
+            J = -J
+
+            call lu_solve(N, J, R, dx)
+            
+            temp_x = temp_x + gamma*dx
+
+            R = calc_R_demo(N,temp_x)
+            err = maxval(abs(R))
+            write(*,*) "temp_x: ", temp_x, err
+        end do
+
+    end function newtons_method
+
+    function aircraft_calc_R(this, N, x, V, loc, euler) result(R)
 
         implicit none
         
         class(aircraft), intent(inout) :: this
+        integer, intent(in) :: N
+        real, intent(in) :: x(N), V, loc(3), euler(3)
 
-    end subroutine newtons_method
+
+
+        real :: y_temp(13), alpha, beta, dy_dt(13), R(6), gravity
+
+        gravity = gravity_English(-loc(3))
+
+        alpha = x(1)
+        beta = x(2)
+
+        y_temp(1) = V*cos(alpha)*cos(beta)
+        y_temp(2) = V*sin(beta)
+        y_temp(3) = V*sin(alpha)*cos(beta)
+
+        ! sct
+        y_temp(4) = -sin(euler(2))
+        y_temp(5) = sin(euler(1))*cos(euler(2))
+        y_temp(6) = cos(euler(1))*cos(euler(2))
+        y_temp(4:6) = y_temp(4:6)*gravity*sin(euler(1))*cos(euler(2))&
+                        /(y_temp(1)*cos(euler(2))*cos(euler(1)) + y_temp(3)*sin(euler(2)))
+        
+        y_temp(7:9) = loc
+
+        y_temp(10:13) = euler_to_quat(euler)
+
+        this%controls = x(3:6)
+
+        dy_dt = this%diff_eq(y_temp)
+
+
+    end function aircraft_calc_R
+
+    function calc_R_demo(N, x) result(R)
+
+        implicit none
+        
+        integer, intent(in) :: N
+        real, intent(in) :: x(N)
+
+        real :: R(N)
+
+        R(1) = x(2) - x(1)**2 + 5
+        R(2) = x(2) - x(1)**2 - (x(1) - 1)
+
+    end function calc_R_demo
 
     function aircraft_calc_R(this, V, H, rot_rates, G, var, theta, psi, solve_bank) result(R)
 
