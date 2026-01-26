@@ -15,7 +15,7 @@ module vehicle_m
         logical :: run_physics
         real :: M, Ixx, Iyy, Izz, Ixy, Iyz, Ixz ! Mass and Inertia matrix
         real, dimension(:), allocatable :: CG_shift ! CG shift from reference point (ft)
-        real :: hx, hy, hz ! Gyroscopic components
+        real, allocatable :: h(:) ! Gyroscopic components
         real :: T0, a ! Thrust parameters
         real, dimension(:), allocatable :: t_location, t_orientation
         real :: S_w, b, c ! Reference area, span, chord
@@ -97,9 +97,7 @@ contains
         call jsonx_get(settings, "mass.Ixy[slug-ft^2]", this%Ixy, 0.0)
         call jsonx_get(settings, "mass.Iyz[slug-ft^2]", this%Iyz, 0.0)
         call jsonx_get(settings, "mass.Ixz[slug-ft^2]", this%Ixz, 0.0)
-        call jsonx_get(settings, "mass.hx[slug-ft^2/s]", this%hx, 0.0)
-        call jsonx_get(settings, "mass.hy[slug-ft^2/s]", this%hy, 0.0)
-        call jsonx_get(settings, "mass.hz[slug-ft^2/s]", this%hz, 0.0)
+        call jsonx_get(settings, "mass.h[slug-ft^2/s]", this%h, 0.0, 3)
 
         ! Thrust Properties
         call jsonx_get(settings, "thrust.T0[lbf]", this%T0, 0.0)
@@ -719,6 +717,7 @@ contains
         dummy(3) = dummy(3) + (I(1,1) - I(2,2))*y(4)*y(5) - I(1,2)*(y(4)**2 - y(5)**2) - I(2,3)*y(4)*y(6) + I(1,3)*y(5)*y(6)
         dy_dt(4:6) = matmul(I_inv, dummy)
 
+        write(*,*) "Gyroscope: ", h
 
 
         ! Eq. 5.4.8
@@ -764,9 +763,7 @@ contains
         real, intent(in) :: y(13)
         real, intent(out) :: h(3)
         
-        h(1) = this%hx
-        h(2) = this%hy
-        h(3) = this%hz
+        h = this%h
         
     end subroutine aircraft_gyroscopic
 
@@ -786,8 +783,6 @@ contains
         call std_atm_English(-y(9), Z, temp, P, rho, a)
         call std_atm_English(0.0, Z_0, temp_0, P_0, rho_0, a_0)
 
-        write(*,*) "T0: ", this%T0
-        write(*,*) "a: ", this%a
         thrust = 0.0
         thrust(1) = throttle*this%T0*(rho/rho_0)**this%a
         if (throttle < 0.0) thrust = 0.0
