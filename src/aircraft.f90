@@ -597,6 +597,14 @@ contains
         this%states(10:13) = euler_to_quat((/phi, theta, psi/))
     end subroutine aircraft_init_to_trim
 
+    subroutine newtons_method(this, func, x, delta, gamma)
+
+        implicit none
+        
+        class(aircraft), intent(inout) :: this
+
+    end subroutine newtons_method
+
     function aircraft_calc_R(this, V, H, rot_rates, G, var, theta, psi, solve_bank) result(R)
 
         implicit none
@@ -788,7 +796,7 @@ contains
 
         thrust = 0.0
         thrust(1) = throttle*this%T0*(rho/rho_0)**this%a
-        if (throttle < 0.0) thrust = 0.0
+        !if (throttle < 0.0) thrust = 0.0
 
     end function aircraft_thrust
 
