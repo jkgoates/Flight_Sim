@@ -734,7 +734,7 @@ contains
                 temp_x(k) = temp_x(k) - 2*this%trim%delta
                 write(*,*) "Negative step"
                 R2 = this%calc_R(temp_x)
-                J(:,k) = (R1 - R2)/(2*this%trim%delta)
+                J(:,i) = (R1 - R2)/(2*this%trim%delta)
                 temp_x(k) = temp_x(k) + this%trim%delta
             end do
             write(*,*)
@@ -776,7 +776,7 @@ contains
 
 
 
-        real :: y_temp(13), alpha, beta, dy_dt(13), R(6), gravity
+        real :: y_temp(13), alpha, beta, dy_dt(13), R(6), gravity, a_c, v_f(3)
 
         write(*,*) "     calc_R function called..."
         write(*,*) "       x = ", x
@@ -792,20 +792,25 @@ contains
         y_temp(2) = this%init_V*sin(beta)
         y_temp(3) = this%init_V*sin(alpha)*cos(beta)
 
+        y_temp(9) = -this%init_alt
+        y_temp(10:13) = euler_to_quat(x(7:9))
+
+        v_f(:) = quat_dependent_to_base(y_temp(1:3), y_temp(10:13))
+
+        ! Gravity relief
+        a_c = (v_f(1)**2 + v_f(2)**2)/((r_e/0.3048) -y_temp(9))
         ! sct
         if (this%trim%type == 'sct') then
             y_temp(4) = -sin(x(8))
             y_temp(5) =  sin(x(7))*cos(x(8))
             y_temp(6) =  cos(x(7))*cos(x(8))
-            y_temp(4:6) = y_temp(4:6)*gravity*sin(x(7))*cos(x(8))&
+            y_temp(4:6) = y_temp(4:6)*(gravity-a_c)*sin(x(7))*cos(x(8))&
                             /(y_temp(1)*cos(x(8))*cos(x(7)) + y_temp(3)*sin(x(8)))
             write(*,*) "Updating rotation rates for sct"
             write(*,*) "   rot_rates", y_temp(4:6)*180/pi
         end if
         
-        y_temp(9) = -this%init_alt
 
-        y_temp(10:13) = euler_to_quat(x(7:9))
 
         this%controls = x(3:6)
 
