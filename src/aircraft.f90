@@ -11,12 +11,17 @@ module vehicle_m
 
     type trim_settings_t
         real :: delta, gamma, tol
+        integer :: max_iter
         character(:), allocatable :: type
+        logical :: verbose, solve_fixed_climb_angle, solve_relative_climb_angle, solve_load_factor
+        real :: climb_angle, load_factor
+        logical, allocatable :: free_vars(:)
     end type trim_settings_t
     
     type :: aircraft
         
         character(:), allocatable :: type
+        type(json_value), pointer :: j_vehicle
         logical :: run_physics
         real :: M, Ixx, Iyy, Izz, Ixy, Iyz, Ixz ! Mass and Inertia matrix
         real, dimension(:), allocatable :: CG_shift ! CG shift from reference point (ft)
@@ -264,7 +269,8 @@ contains
         call jsonx_get(j_initial, "altitude[ft]", this%init_alt)
         call jsonx_get(j_initial, "latitude[deg]", lat)
         call jsonx_get(j_initial, "longitude[deg]", long)
-        call jsonx_get(j_initial, "Euler_angles[deg]", this%init_eul, 3)
+        call jsonx_get(j_initial, "Euler_angles[deg]", this%init_eul)
+        this%init_eul = this%init_eul*PI/180.
 
         ! Get type of initialization
         call jsonx_get(j_initial, "type", init_type)
@@ -274,7 +280,7 @@ contains
         case("state")
             call this%init_to_state(j_initial)
         case("trim")
-            call this%init_to_trim(j_initial, V,H, Euler)
+            call this%init_to_trim(j_initial)
         case default
             write(*,*) "!!! Type "//init_type//" is not recognized as a valid init type. Quitting..."
             stop
@@ -305,7 +311,6 @@ contains
         this%controls(3) = dr*PI/180.
         this%controls(4) = throttle
 
-        this%init_eul = this%init_eul*PI/180.
         !phi = phi*PI/180.
         !theta = theta*PI/180.
         !psi = psi*PI/180.
@@ -341,10 +346,79 @@ contains
 
         class(aircraft), intent(inout) :: this
         type(json_value), pointer, intent(in) :: j_initial
+        type(json_value), pointer :: j_trim, j_solver
+        integer, parameter :: n_vars = 9
+        integer :: n_free, i
+        integer, allocatable :: idx_free(:)
+        real :: x(n_vars)
+        logical :: found
+
+        allocate(this%trim%free_vars(n_vars))
+
+        write(*,*) "    - trimming..."
+
+        !call jsonx_get(this%j_vehicle, 'initial', j_initial)
+        call jsonx_get(j_initial, 'trim', j_trim)
+        call jsonx_get(j_trim, 'solver', j_solver)
+        call jsonx_get(j_trim, "type", this%trim%type)
+
+        write(*,*)
+        write(*,*) '    Trimming vehicle for ', this%trim%type
+
+        call jsonx_get(j_solver, "finite_difference_step_size", this%trim%delta)
+        call jsonx_get(j_solver, "relaxation_factor", this%trim%gamma)
+        call jsonx_get(j_solver, "tolerance", this%trim%tol)
+        call jsonx_get(j_solver, "max_iterations", this%trim%max_iter)
+        call jsonx_get(j_solver, "verbose", this%trim%verbose)
 
 
-        call jsonx_get(j_initial, "trim.type", this%trim%type)
+        write(*,*) 
+        write(*,*) "Newton Solver Settings:"
+        write(*,*) "step size", this%trim%delta
+        write(*,*) "gamma    ", this%trim%gamma
+        write(*,*) "tolerance", this%trim%tol
 
+
+        this%trim%solve_fixed_climb_angle = .false.
+        this%trim%solve_relative_climb_angle = .false.
+        this%trim%solve_load_factor = .false.
+
+        x(:) = 0.0
+        x(7:9) = this%init_eul(:)
+        this%trim%free_vars(:) = .true.
+        this%trim%free_vars(7:9) = .false.
+
+        if(this%trim%type == 'shss') then
+            call json_get(j_trim, 'sideslip_angle[deg]', x(2), found)
+            if (found) then
+                x(2) = x(2)*pi/180.0
+                this%trim%free_vars(7) = .true.
+                this%trim%free_vars(2) = .false.
+            end if
+        end if
+
+        n_free = count(this%trim%free_vars)
+        
+
+        idx_free = pack([(i,i=1,n_vars)], this%trim%free_vars)
+
+        write(*,*) 'n_vars', n_vars
+        write(*,*) 'n_free', n_free
+        write(*,*) 'free_vars', this%trim%free_vars
+        write(*,*) 'idx_free',idx_free 
+
+        x = this%newtons_method(n_free, x, idx_free)
+
+        write(*,*) "final"
+        write(*,*) "alpha[deg] =", x(1)*180/pi
+        write(*,*) "beta[deg]  =", x(2)*180/pi
+        write(*,*) "da[deg]    =", x(3)*180/pi
+        write(*,*) "de[deg]    =", x(4)*180/pi
+        write(*,*) "dr[deg]    =", x(5)*180/pi
+        write(*,*) "throttle   =", x(6)
+        write(*,*) "phi[deg]   =", x(7)*180/pi
+        write(*,*) "theta[deg] =", x(8)*180/pi
+        write(*,*) "psi[deg]   =", x(9)*180/pi
 
     end subroutine aircraft_init_to_trim
 
@@ -617,83 +691,129 @@ contains
         !this%states(10:13) = euler_to_quat((/phi, theta, psi/))
     !end subroutine aircraft_init_to_trim_old
 
-    function aircraft_newtons_method (N, x, delta, gamma, tol) result(temp_x)
+    function aircraft_newtons_method (this, N, x, idx_free) result(temp_x)
 
         implicit none
-        
+        class(aircraft), intent(inout) :: this        
         integer, intent(in) :: N
-        real, intent(in) :: x(N), delta, gamma, tol
+        real, intent(in) :: x(9)
+        integer, allocatable, intent(in) :: idx_free(:)
 
-        real :: R(N), R1(N), R2(N), J(N,N), temp_x(N), err
+        real :: R(N), R1(N), R2(N), J(N,N), temp_x(9), err
         real, allocatable :: dx(:)
-        integer :: i, k
+        integer :: i, k, iter
 
         temp_x = x
 
-        R = calc_R_demo(N,temp_x)
+        iter = 0
+
+
+        R = this%calc_R(temp_x)
         err = maxval(abs(R))
 
-        do while (err > tol)
+        write(*,'(I10, 10ES20.12)') iter, err, x(1:5)*180.0/pi, x(6), x(7:9)*180/PI
 
-            do k = 1, N
-                temp_x(k) = temp_x(k) + delta
-                R1 = calc_R_demo(N,temp_x)
-                temp_x(k) = temp_x(k) - 2*delta
-                R2 = calc_R_demo(N,temp_x)
-                do i = 1, N
-                    J(i,k) = (R1(i) - R2(i))/(2*delta)
-                end do
-                temp_x(k) = temp_x(k) + delta
+        do while (err > this%trim%tol)
+            iter = iter + 1
+
+            write(*,*)
+            write(*,*) " -------------------------"
+            write(*,*) " Beginning Iteration", iter
+            write(*,*) " -------------------------"
+            write(*,*)
+
+            write(*,*) "Building Jacobian matrix"
+            write(*,*)
+            do i = 1, N
+                k = idx_free(i)
+                write(*,*) 
+                write(*,*) "Computing gradient relative to x[", k,"]"
+                temp_x(k) = temp_x(k) + this%trim%delta
+                write(*,*) "Positive step"
+                R1 = this%calc_R(temp_x)
+                temp_x(k) = temp_x(k) - 2*this%trim%delta
+                write(*,*) "Negative step"
+                R2 = this%calc_R(temp_x)
+                J(:,k) = (R1 - R2)/(2*this%trim%delta)
+                temp_x(k) = temp_x(k) + this%trim%delta
             end do
+            write(*,*)
+            write(*,*) "Jacobian matrix = "
+            write(*,*) J
+            write(*,*)
             
             J = -J
 
             call lu_solve(N, J, R, dx)
-            
-            temp_x = temp_x + gamma*dx
 
-            R = calc_R_demo(N,temp_x)
+            write(*,*)  "Delta x = ", dx
+            
+            do i = 1, N
+                k = idx_free(i)
+                temp_x(k) = temp_x(k) + this%trim%gamma*dx(i)
+            end do
+            write(*,*)  "new x = ", temp_x
+
+            write(*,*)
+            write(*,*) "Computing residual..."
+            R = this%calc_R(temp_x)
             err = maxval(abs(R))
-            write(*,*) "temp_x: ", temp_x, err
+            write(*,*) 
+            write(*,*) "New R = ", R
+            write(*,*) "epsilon = ", err
+
+            if (iter > this%trim%max_iter) exit
         end do
 
     end function aircraft_newtons_method
 
-    function aircraft_calc_R(this, N, x, V, loc, euler) result(R)
+    function aircraft_calc_R(this, x) result(R)
 
         implicit none
         
         class(aircraft), intent(inout) :: this
-        integer, intent(in) :: N
-        real, intent(in) :: x(N), V, loc(3), euler(3)
+        real, intent(in) :: x(9)
 
 
 
         real :: y_temp(13), alpha, beta, dy_dt(13), R(6), gravity
 
-        gravity = gravity_English(-loc(3))
+        write(*,*) "     calc_R function called..."
+        write(*,*) "       x = ", x
+
+        gravity = gravity_English(this%init_alt)
 
         alpha = x(1)
         beta = x(2)
 
-        y_temp(1) = V*cos(alpha)*cos(beta)
-        y_temp(2) = V*sin(beta)
-        y_temp(3) = V*sin(alpha)*cos(beta)
+        y_temp = 0.0
+
+        y_temp(1) = this%init_V*cos(alpha)*cos(beta)
+        y_temp(2) = this%init_V*sin(beta)
+        y_temp(3) = this%init_V*sin(alpha)*cos(beta)
 
         ! sct
-        y_temp(4) = -sin(euler(2))
-        y_temp(5) = sin(euler(1))*cos(euler(2))
-        y_temp(6) = cos(euler(1))*cos(euler(2))
-        y_temp(4:6) = y_temp(4:6)*gravity*sin(euler(1))*cos(euler(2))&
-                        /(y_temp(1)*cos(euler(2))*cos(euler(1)) + y_temp(3)*sin(euler(2)))
+        if (this%trim%type == 'sct') then
+            y_temp(4) = -sin(x(8))
+            y_temp(5) =  sin(x(7))*cos(x(8))
+            y_temp(6) =  cos(x(7))*cos(x(8))
+            y_temp(4:6) = y_temp(4:6)*gravity*sin(x(7))*cos(x(8))&
+                            /(y_temp(1)*cos(x(8))*cos(x(7)) + y_temp(3)*sin(x(8)))
+            write(*,*) "Updating rotation rates for sct"
+            write(*,*) "   rot_rates", y_temp(4:6)*180/pi
+        end if
         
-        y_temp(7:9) = loc
+        y_temp(9) = -this%init_alt
 
-        y_temp(10:13) = euler_to_quat(euler)
+        y_temp(10:13) = euler_to_quat(x(7:9))
 
         this%controls = x(3:6)
 
         dy_dt = this%diff_eq(y_temp)
+
+        R = dy_dt(1:6)
+
+        write(*,*) "      R = ", R
 
 
     end function aircraft_calc_R
@@ -712,49 +832,49 @@ contains
 
     end function calc_R_demo
 
-    function aircraft_calc_R(this, V, H, rot_rates, G, var, theta, psi, solve_bank) result(R)
+    !function aircraft_calc_R(this, V, H, rot_rates, G, var, theta, psi, solve_bank) result(R)
 
-        implicit none
-        class(aircraft), intent(inout) :: this
-        real, intent(in) :: V, H, G(6), rot_rates(3), var, theta, psi
-        logical, intent(in) :: solve_bank
-        real :: alpha, beta, phi
-        real :: R(6)
+        !implicit none
+        !class(aircraft), intent(inout) :: this
+        !real, intent(in) :: V, H, G(6), rot_rates(3), var, theta, psi
+        !logical, intent(in) :: solve_bank
+        !real :: alpha, beta, phi
+        !real :: R(6)
 
-        real :: y_temp(13), dy_dt(13)
+        !real :: y_temp(13), dy_dt(13)
 
 
-        ! Parse G
-        alpha = G(1)
-        if (solve_bank) then
-            beta = var
-            phi = G(2)
-        else
-            beta = G(2)
-            phi = var
-        end if
-        this%controls = G(3:6)
+        !! Parse G
+        !alpha = G(1)
+        !if (solve_bank) then
+            !beta = var
+            !phi = G(2)
+        !else
+            !beta = G(2)
+            !phi = var
+        !end if
+        !this%controls = G(3:6)
 
-        ! Set state
-        y_temp = 0.0
+        !! Set state
+        !y_temp = 0.0
 
-        y_temp(1) = V*cos(alpha)*cos(beta)
-        y_temp(2) = V*sin(beta)
-        y_temp(3) = V*sin(alpha)*cos(beta)
-        y_temp(4) = rot_rates(1)
-        y_temp(5) = rot_rates(2)
-        y_temp(6) = rot_rates(3)
+        !y_temp(1) = V*cos(alpha)*cos(beta)
+        !y_temp(2) = V*sin(beta)
+        !y_temp(3) = V*sin(alpha)*cos(beta)
+        !y_temp(4) = rot_rates(1)
+        !y_temp(5) = rot_rates(2)
+        !y_temp(6) = rot_rates(3)
 
-        y_temp(9) = -H
+        !y_temp(9) = -H
 
-        y_temp(10:13) = euler_to_quat((/phi, theta, psi/))
+        !y_temp(10:13) = euler_to_quat((/phi, theta, psi/))
 
-        ! Run diff_eq
-        dy_dt = this%diff_eq( y_temp)
+        !! Run diff_eq
+        !dy_dt = this%diff_eq( y_temp)
         
-        R = dy_dt(1:6)
+        !R = dy_dt(1:6)
 
-    end function aircraft_calc_R
+    !end function aircraft_calc_R
 
     function aircraft_runge_kutta(this, y_0, dt) result(y)
 
@@ -833,8 +953,6 @@ contains
         dummy(2) = dummy(2) + (I(3,3) - I(1,1))*y(4)*y(6) - I(1,3)*(y(6)**2 - y(4)**2) - I(1,2)*y(5)*y(6) + I(2,3)*y(4)*y(5)
         dummy(3) = dummy(3) + (I(1,1) - I(2,2))*y(4)*y(5) - I(1,2)*(y(4)**2 - y(5)**2) - I(2,3)*y(4)*y(6) + I(1,3)*y(5)*y(6)
         dy_dt(4:6) = matmul(I_inv, dummy)
-
-        write(*,*) "Gyroscope: ", h
 
 
         ! Eq. 5.4.8

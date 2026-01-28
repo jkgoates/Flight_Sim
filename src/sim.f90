@@ -58,9 +58,6 @@ contains
 
         call udp_initialize()         ! for windows users
 
-        x = newtons_method(2, (/0.0, 0.0/), 0.01, 1.0, 1.0e-12)
-
-        write(*,*) "SOLVED FOR X: ", x
         
     end subroutine init
 
