@@ -5,6 +5,9 @@ module vehicle_m
 
     implicit none
 
+    integer :: geographic_model_ID
+    character(len=:), allocatable :: geographic_model
+
     type stall_settings_t
         real :: alpha_0, alpha_s, lambda_b, minval        
     end type stall_settings_t
@@ -397,6 +400,23 @@ contains
             end if
         end if
 
+        call json_get(j_trim, 'relative_climb_angle[deg]', this%trim%climb_angle, found)
+        if (found) then
+            this%trim%climb_angle = this%trim%climb_angle*pi/180.0
+            x(8) = this%trim%climb_angle
+            this%trim%solve_relative_climb_angle = .true.
+            this%trim%free_vars(8) = .true.
+        end if
+
+        if (this%trim%type == 'sct') then
+            call json_get(j_trim, 'load_factor', this%trim%load_factor, found)
+            if (found) then
+                x(7) = -acos(cos(x(8))/this%trim%load_factor)
+                this%trim%solve_load_factor = .true.
+                this%trim%free_vars(7) = .true.
+            end if
+        end if
+
         n_free = count(this%trim%free_vars)
         
 
@@ -708,7 +728,7 @@ contains
         iter = 0
 
 
-        R = this%calc_R(temp_x)
+        R = this%calc_R(temp_x, N)
         err = maxval(abs(R))
 
         write(*,'(I10, 10ES20.12)') iter, err, x(1:5)*180.0/pi, x(6), x(7:9)*180/PI
@@ -730,10 +750,10 @@ contains
                 write(*,*) "Computing gradient relative to x[", k,"]"
                 temp_x(k) = temp_x(k) + this%trim%delta
                 write(*,*) "Positive step"
-                R1 = this%calc_R(temp_x)
+                R1 = this%calc_R(temp_x, N)
                 temp_x(k) = temp_x(k) - 2*this%trim%delta
                 write(*,*) "Negative step"
-                R2 = this%calc_R(temp_x)
+                R2 = this%calc_R(temp_x, N)
                 J(:,i) = (R1 - R2)/(2*this%trim%delta)
                 temp_x(k) = temp_x(k) + this%trim%delta
             end do
@@ -756,7 +776,7 @@ contains
 
             write(*,*)
             write(*,*) "Computing residual..."
-            R = this%calc_R(temp_x)
+            R = this%calc_R(temp_x, N)
             err = maxval(abs(R))
             write(*,*) 
             write(*,*) "New R = ", R
@@ -767,16 +787,17 @@ contains
 
     end function aircraft_newtons_method
 
-    function aircraft_calc_R(this, x) result(R)
+    function aircraft_calc_R(this, x, N) result(R)
 
         implicit none
         
         class(aircraft), intent(inout) :: this
         real, intent(in) :: x(9)
+        integer, intent(in) :: N
+        real :: R(N)
 
-
-
-        real :: y_temp(13), alpha, beta, dy_dt(13), R(6), gravity, a_c, v_f(3)
+        integer :: last
+        real :: y_temp(13), alpha, beta, dy_dt(13), gravity, a_c, v_f(3), climb_angle, load_factor, F(3), M(3), mass, I(3,3)
 
         write(*,*) "     calc_R function called..."
         write(*,*) "       x = ", x
@@ -816,7 +837,24 @@ contains
 
         dy_dt = this%diff_eq(y_temp)
 
-        R = dy_dt(1:6)
+        R(1:6) = dy_dt(1:6)
+        last = 6
+
+        if (this%trim%solve_relative_climb_angle) then
+            last = last+1
+            climb_angle = asin((y_temp(1)*sin(x(8)) - (y_temp(2)*sin(x(7)) + y_temp(3)*cos(x(7)))*cos(x(8)))/norm2(y_temp(1:3)))
+            R(last) = this%trim%climb_angle - climb_angle
+        end if
+
+        if (this%trim%solve_load_factor) then
+            last = last+1
+            call this%pseudo_aero(y_temp, F, M)
+            call this%mass_inertia(y_temp, mass, I)
+            write(*,*) "F: ", F
+            load_factor = (F(1)*sin(alpha) - F(3)*cos(alpha))/(mass*(gravity-a_c))
+            write(*,*) "  Load Factor: ", load_factor
+            R(last) = this%trim%load_factor - load_factor
+        end if
 
         write(*,*) "      R = ", R
 
@@ -1353,6 +1391,25 @@ contains
         end if
 
     end function aircraft_tick_states
+
+
+    subroutine aircraft_update_geographics(this, y1, y2)
+        implicit none
+        class(aircraft), intent(inout) :: this
+        real, intent(in) :: y1(13), y2(13)
+
+        real :: d
+
+        d = sqrt((y2(7)-y1(7))**2 + (y2(8)-y1(8))**2)
+
+        if (d < 1e-12) then
+            
+        else
+
+
+        end if
+
+    end subroutine
 
 
     subroutine aircraft_print_aero_table(this, V, H)

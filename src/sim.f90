@@ -55,6 +55,9 @@ contains
 
         call jsonx_get(j_main, "simulation.rk4_verbose", verbose, default_value=.false.)
         call jsonx_get(j_main, "simulation.save_states", save_states, default_value=.false.)
+        call jsonx_get(j_main, "simulation.geographic_model", geographic_model, default_value='none')
+        geographic_model_ID = 0
+        if (geographic_model == 'sphere') geographic_model_ID = 1
 
         call udp_initialize()         ! for windows users
 
