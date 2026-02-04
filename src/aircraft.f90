@@ -50,6 +50,8 @@ module vehicle_m
         real :: init_V, init_alt, init_states
         real, allocatable :: init_eul(:)
 
+        real :: latitude, longitude
+
         type(stall_settings_t) :: CD_stall, CL_stall, Cm_stall
         type(trim_settings_t) :: trim
         logical :: include_stall
@@ -270,10 +272,11 @@ contains
         ! State
         call jsonx_get(j_initial, "airspeed[ft/s]", this%init_V)
         call jsonx_get(j_initial, "altitude[ft]", this%init_alt)
-        call jsonx_get(j_initial, "latitude[deg]", lat)
-        call jsonx_get(j_initial, "longitude[deg]", long)
+        call jsonx_get(j_initial, "latitude[deg]", this%latitude)
+        call jsonx_get(j_initial, "longitude[deg]", this%longitude)
         call jsonx_get(j_initial, "Euler_angles[deg]", this%init_eul)
         this%init_eul = this%init_eul*PI/180.
+        this%latitude = this%latitude*
 
         ! Get type of initialization
         call jsonx_get(j_initial, "type", init_type)
@@ -1370,7 +1373,7 @@ contains
         
         class(aircraft), intent(inout) :: this
         real, intent(in) :: dt
-        real :: new_states(13)
+        real :: y(13), y1(13)
 
 
         if (this%run_physics) then
@@ -1379,8 +1382,14 @@ contains
                 write(*,'(A,13ES20.12)') "y: ", this%states
                 write(*,*) "----------------------"
             end if
+            y = this%states
 
-            this%states = this%runge_kutta(this%states, dt)
+            y1 = this%runge_kutta(y, dt)
+
+            if (geographic_model_ID > 0) call this%update_geographics(y,y1)
+
+            this%states = y1
+
             if (verbose) then
                 write(*,*) " State at end of RK4."
                 write(*,'(A,13ES20.12)') "y: ", this%states
@@ -1398,13 +1407,19 @@ contains
         class(aircraft), intent(inout) :: this
         real, intent(in) :: y1(13), y2(13)
 
-        real :: d
+        real :: d, dx, dy, dz
+        real :: H1
 
-        d = sqrt((y2(7)-y1(7))**2 + (y2(8)-y1(8))**2)
+        dx = y2(7) - y1(7)
+        dy = y2(8) - y1(8)
+        dz = y2(9) - y1(9)
+
+        d = sqrt(dx**2 + dy**2)
 
         if (d < 1e-12) then
             
         else
+            H1 = -y2(9)
 
 
         end if

@@ -3,7 +3,8 @@
         "time_step[s]" : 0.01,
         "end_time[s]" : 30.0,
         "rk4_verbose" : true,
-        "save_states" : true
+        "save_states" : true,
+        "geographic_model": "sphere"
     },
     "vehicles" : {
         "ping-pong-ball" : {
