@@ -1,8 +1,8 @@
 {
     "simulation" : {
-        "time_step[s]" : 0.01,
-        "end_time[s]" : 30.0,
-        "rk4_verbose" : true,
+        "time_step[s]" : 0.0015,
+        "end_time[s]" : 0.003,
+        "rk4_verbose" : false,
         "save_states" : true,
         "geographic_model": "sphere"
     },
@@ -49,7 +49,12 @@
                 "Iyy[slug-ft^2]" : 0.00097,
                 "Izz[slug-ft^2]" : 0.00097
             },
-            "thrust" : {},
+            "thrust" : {
+                "location[ft]" : [0.0, 0.0, 0.0],
+                "orientation[deg]" : [0.0, 0.0, 0.0],
+                "T0[lbf]" : 29550,
+                "Ta" : 0.84
+            },
             "aerodynamics" : {
                 "reference" : {
                     "area[ft^2]" : 0.000218,
@@ -68,8 +73,8 @@
                         "CL1_CL1" : 48.138
                     },
                     "Cl" : {
-                        "1" : 0.0,
-                        "0" : 3.223,
+                        "0" : 0.0,
+                        "1" : 3.223,
                         "pbar" : -5.378
                     },
                     "Cm" : {
@@ -79,11 +84,11 @@
                 }
             },
             "initial" : {
-                "airspeed[ft/s]" : 210.0,
-                "altitude[ft]" : 5.0,
+                "airspeed[ft/s]" : 6582.91440687328,
+                "altitude[ft]" : 60000.0,
                 "latitude[deg]" : 0.0,
                 "longitude[deg]" : 0.0,
-                "Euler_angles[deg]" : [0.0, 5.0, 0.0],
+                "Euler_angles[deg]" : [0.0, 0.0, 45.0],
                 "type" : "state",
                 "state" : {
                     "angle_of_attack[deg]" : 0.0,
@@ -91,12 +96,25 @@
                     "p[deg/s]" : 0.0,
                     "q[deg/s]" : 0.0,
                     "r[deg/s]" : 0.0
+                },
+                "trim" : {
+                    "type" : "sct",
+                    "relative_climb_angle[deg]" : 0.0,
+                    "_sideslip_angle[deg]" : -10.0,
+                    "_load_factor" : 2.0,
+                    "solver" : {
+                        "finite_difference_step_size" : 0.01,
+                        "relaxation_factor" : 0.9,
+                        "tolerance" : 1.0e-30,
+                        "max_iterations" : 1000,
+                        "verbose" : true
+                    }
                 }
             }
         },
         "F16" : {
             "type" : "aircraft",
-            "run_physics" : false,
+            "run_physics" : true,
             "mass" : {
                 "weight[lbf]" : 20500.0,
                 "Ixx[slug-ft^2]" : 9496.0,
@@ -193,11 +211,11 @@
                 }
             },
             "initial" : {
-                "airspeed[ft/s]" : 550.0,
-                "altitude[ft]" : 0.0,
+                "airspeed[ft/s]" : 6582.91440687328,
+                "altitude[ft]" : 60000,
                 "latitude[deg]" : 0.0,
                 "longitude[deg]" : 0.0,
-                "Euler_angles[deg]" : [0.0, 0.0, 0.0],
+                "Euler_angles[deg]" : [0.0, 0.0, 45.0],
                 "type" : "trim",
                 "state" : {
                     "angle_of_attack[deg]" : 11.278107537468,
@@ -212,13 +230,45 @@
                 },
                 "trim" : {
                     "type" : "sct",
-                    "relative_climb_angle[deg]" : 45.0,
+                    "relative_climb_angle[deg]" : 0.0,
                     "_sideslip_angle[deg]" : -10.0,
-                    "load_factor" : 2.0,
+                    "_load_factor" : 1.2,
                     "solver" : {
                         "finite_difference_step_size" : 0.01,
                         "relaxation_factor" : 0.9,
-                        "tolerance" : 1.0e-13,
+                        "tolerance" : 1.0e-14,
+                        "max_iterations" : 1000,
+                        "verbose" : true
+                    }
+                }
+            },
+            "xinitial" : {
+                "airspeed[ft/s]" : 550,
+                "altitude[ft]" : 30000,
+                "latitude[deg]" : 80.0,
+                "longitude[deg]" : 90.0,
+                "Euler_angles[deg]" : [0.0, 0.0, 45.0],
+                "type" : "trim",
+                "state" : {
+                    "angle_of_attack[deg]" : 11.278107537468,
+                    "sideslip_angle[deg]" : 0.022727214169,
+                    "p[deg/s]" : -0.766207504385,
+                    "q[deg/s]" : 3.834356702909,
+                    "r[deg/s]" : 3.834356702909,
+                    "aileron[deg]" : 0.123007387668,
+                    "elevator[deg]" : -11.389397552606,
+                    "rudder[deg]" : -0.871269845919,
+                    "throttle" : 0.129524457808
+                },
+                "trim" : {
+                    "type" : "sct",
+                    "relative_climb_angle[deg]" : 0.0,
+                    "_sideslip_angle[deg]" : -10.0,
+                    "load_factor" : 1.2,
+                    "solver" : {
+                        "finite_difference_step_size" : 0.01,
+                        "relaxation_factor" : 0.9,
+                        "tolerance" : 1.0e-14,
                         "max_iterations" : 1000,
                         "verbose" : true
                     }

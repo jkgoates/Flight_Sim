@@ -35,6 +35,17 @@ contains
         ! Load JSON file
         call jsonx_load(filename, j_main)
 
+        call jsonx_get(j_main, "simulation.rk4_verbose", verbose, default_value=.false.)
+        call jsonx_get(j_main, "simulation.save_states", save_states, default_value=.false.)
+        call jsonx_get(j_main, "simulation.geographic_model", geographic_model, default_value='none')
+        geographic_model_ID = 0
+        if (geographic_model == 'sphere') geographic_model_ID = 1
+
+        if (save_states) then
+            open(newunit=io_unit, file='sim_output.csv', status='replace', action='write')
+            write(io_unit,*) 'time[s], u[ft/s], v[ft/s], w[ft/s], p[rad/s], q[rad/s], r[rad/s], xf[ft], yf[ft], zf[ft], e0, ex, ey, ez, lat, long, azimuth'
+        end if
+
         ! Initialize vehicles
         call jsonx_get(j_main, "vehicles", p1)
         N = json_value_count(p1)
@@ -53,11 +64,6 @@ contains
             cnt = cnt+1
         end do
 
-        call jsonx_get(j_main, "simulation.rk4_verbose", verbose, default_value=.false.)
-        call jsonx_get(j_main, "simulation.save_states", save_states, default_value=.false.)
-        call jsonx_get(j_main, "simulation.geographic_model", geographic_model, default_value='none')
-        geographic_model_ID = 0
-        if (geographic_model == 'sphere') geographic_model_ID = 1
 
         call udp_initialize()         ! for windows users
 
@@ -68,7 +74,7 @@ contains
 
         implicit none
 
-        real :: t, y(13), y_temp(13)
+        real :: t
         integer :: io_unit, i
         real :: dt, tf
         logical :: t_R, crashed
@@ -91,12 +97,6 @@ contains
             !call vehicles(i)%print_aero_table(norm2(y(1:3)), -y(9))
         !end do
 
-        !open(newunit=io_unit, file='sim_output.csv', status='replace', action='write')
-        !write(io_unit,*) 'time[s], u[ft/s], v[ft/s], w[ft/s], p[rad/s], q[rad/s], r[rad/s], xf[ft], yf[ft], zf[ft], e0, ex, ey, ez'
-        !write(io_unit,'(ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12, &
-                        !A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12)') &
-                            !t,',',y(1),',',y(2),',',y(3),',',y(4),',',y(5),',' &
-                            !,y(6),',',y(7),',',y(8),',',y(9),',',y(10),',',y(11),',',y(12),',',y(13)
 
         !call quat_norm(y(10:13))
 
@@ -108,14 +108,12 @@ contains
         end if
 
         if (t_R) then
-            y_temp = y
             t_p = get_time()
             do i = 1, size(vehicles)
-                y = vehicles(i)%tick_states(dt)
+                call vehicles(i)%tick_states(t, dt)
             end do
             t_c = get_time()
             dt = t_c - t_p
-            y = y_temp
             t_p = t_c
         end if
 
@@ -135,7 +133,7 @@ contains
             end if
 
             do i = 1, size(vehicles)
-                y = vehicles(i)%tick_states(dt)
+                call vehicles(i)%tick_states(t, dt)
             end do
             !y = runge_kutta(t, y, dt)
             t = t + dt
@@ -150,14 +148,11 @@ contains
             end if
 
 
-            write(io_unit,'(ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,&
-                            ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12)') &
-                            t,',',y(1),',',y(2),',',y(3),',',y(4),',',y(5),',' &
-                            ,y(6),',',y(7),',',y(8),',',y(9),',',y(10),',',y(11),',',y(12),',',y(13)
+            !write(io_unit,'(ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,&
+                            !ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12)') &
+                            !t,',',y(1),',',y(2),',',y(3),',',y(4),',',y(5),',' &
+                            !,y(6),',',y(7),',',y(8),',',y(9),',',y(10),',',y(11),',',y(12),',',y(13)
 
-            s(1) = t
-            s(2:10) = y(1:9)
-            s(11:13) = quat_to_euler(y(10:13))
 
             !crashed = vehicle%check_collision(t, y)
             !if (crashed) exit

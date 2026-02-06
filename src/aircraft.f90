@@ -5,7 +5,7 @@ module vehicle_m
 
     implicit none
 
-    integer :: geographic_model_ID
+    integer :: geographic_model_ID, io_unit
     character(len=:), allocatable :: geographic_model
 
     type stall_settings_t
@@ -76,6 +76,7 @@ module vehicle_m
         procedure :: runge_kutta => aircraft_runge_kutta
         procedure :: diff_eq       => aircraft_diff_eq
         procedure :: newtons_method => aircraft_newtons_method
+        procedure :: update_geographics => aircraft_update_geographics
     
     end type aircraft
     
@@ -276,7 +277,7 @@ contains
         call jsonx_get(j_initial, "longitude[deg]", this%longitude)
         call jsonx_get(j_initial, "Euler_angles[deg]", this%init_eul)
         this%init_eul = this%init_eul*PI/180.
-        this%latitude = this%latitude*
+        this%latitude = this%latitude*PI/180.
 
         ! Get type of initialization
         call jsonx_get(j_initial, "type", init_type)
@@ -291,6 +292,16 @@ contains
             write(*,*) "!!! Type "//init_type//" is not recognized as a valid init type. Quitting..."
             stop
         end select
+
+        if (save_states .and. this%run_physics) then
+            write(io_unit,'(ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12, &
+                            A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12)') &
+                                0.0,',',this%states(1),',',this%states(2),',',this%states(3),','&
+                                ,this%states(4),',',this%states(5),',' &
+                                ,this%states(6),',',this%states(7),',',this%states(8),',',this%states(9),','&
+                                ,this%states(10),',',this%states(11),',',this%states(12),',',this%states(13),',' &
+                                ,this%latitude*180/pi,',',this%longitude*180/pi, ',', this%init_eul(3)*180/pi
+        end if
 
     end subroutine aircraft_init
 
@@ -358,6 +369,7 @@ contains
         integer, allocatable :: idx_free(:)
         real :: x(n_vars)
         logical :: found
+        real :: v_f(3), a_c, alpha, beta, gravity
 
         allocate(this%trim%free_vars(n_vars))
 
@@ -442,6 +454,34 @@ contains
         write(*,*) "phi[deg]   =", x(7)*180/pi
         write(*,*) "theta[deg] =", x(8)*180/pi
         write(*,*) "psi[deg]   =", x(9)*180/pi
+
+        !this%states = 0.0
+
+        !alpha = x(1)
+        !beta = x(2)
+
+        !this%states(1) = this%init_V*cos(alpha)*cos(beta)
+        !this%states(2) = this%init_V*sin(beta)
+        !this%states(3) = this%init_V*sin(alpha)*cos(beta)
+
+        !this%states(9) = -this%init_alt
+        !this%states(10:13) = euler_to_quat(x(7:9))
+
+        !v_f(:) = quat_dependent_to_base(this%states(1:3), this%states(10:13))
+
+        !! Gravity relief
+        !a_c = (v_f(1)**2 + v_f(2)**2)/((r_e/0.3048) -this%states(9))
+        !! sct
+        !if (this%trim%type == 'sct') then
+            !this%states(4) = -sin(x(8))
+            !this%states(5) =  sin(x(7))*cos(x(8))
+            !this%states(6) =  cos(x(7))*cos(x(8))
+            !this%states(4:6) = this%states(4:6)*(gravity-a_c)*sin(x(7))*cos(x(8))&
+                            !/(this%states(1)*cos(x(8))*cos(x(7)) + this%states(3)*sin(x(8)))
+            !write(*,*) "rot_rates: ", this%states(4:6)
+        !end if
+
+        !this%controls = x(3:6)
 
     end subroutine aircraft_init_to_trim
 
@@ -739,51 +779,60 @@ contains
         do while (err > this%trim%tol)
             iter = iter + 1
 
-            write(*,*)
-            write(*,*) " -------------------------"
-            write(*,*) " Beginning Iteration", iter
-            write(*,*) " -------------------------"
-            write(*,*)
+            if (verbose) then
+                write(*,*)
+                write(*,*) " -------------------------"
+                write(*,*) " Beginning Iteration", iter
+                write(*,*) " -------------------------"
+                write(*,*)
 
-            write(*,*) "Building Jacobian matrix"
-            write(*,*)
+                write(*,*) "Building Jacobian matrix"
+                write(*,*)
+            end if
             do i = 1, N
                 k = idx_free(i)
-                write(*,*) 
-                write(*,*) "Computing gradient relative to x[", k,"]"
+                if (verbose) then
+                    write(*,*) 
+                    write(*,*) "Computing gradient relative to x[", k,"]"
+                end if
                 temp_x(k) = temp_x(k) + this%trim%delta
-                write(*,*) "Positive step"
+                if (verbose) write(*,*) "Positive step"
                 R1 = this%calc_R(temp_x, N)
                 temp_x(k) = temp_x(k) - 2*this%trim%delta
-                write(*,*) "Negative step"
+                if (verbose) write(*,*) "Negative step"
                 R2 = this%calc_R(temp_x, N)
                 J(:,i) = (R1 - R2)/(2*this%trim%delta)
                 temp_x(k) = temp_x(k) + this%trim%delta
             end do
-            write(*,*)
-            write(*,*) "Jacobian matrix = "
-            write(*,*) J
-            write(*,*)
+            if (verbose) then
+                write(*,*)
+                write(*,*) "Jacobian matrix = "
+                write(*,*) J
+                write(*,*)
+            end if
             
             J = -J
 
             call lu_solve(N, J, R, dx)
 
-            write(*,*)  "Delta x = ", dx
+            if (verbose) write(*,*)  "Delta x = ", dx
             
             do i = 1, N
                 k = idx_free(i)
                 temp_x(k) = temp_x(k) + this%trim%gamma*dx(i)
             end do
-            write(*,*)  "new x = ", temp_x
-
-            write(*,*)
-            write(*,*) "Computing residual..."
+            if (verbose) then
+                write(*,*)  "new x = ", temp_x
+                write(*,*)
+                write(*,*) "Computing residual..."
+            end if
             R = this%calc_R(temp_x, N)
             err = maxval(abs(R))
-            write(*,*) 
-            write(*,*) "New R = ", R
-            write(*,*) "epsilon = ", err
+            if (verbose) then
+                write(*,*) 
+                write(*,*) "New R = ", R
+                write(*,*) "epsilon = ", err
+            end if
 
             if (iter > this%trim%max_iter) exit
         end do
@@ -802,8 +851,10 @@ contains
         integer :: last
         real :: y_temp(13), alpha, beta, dy_dt(13), gravity, a_c, v_f(3), climb_angle, load_factor, F(3), M(3), mass, I(3,3)
 
-        write(*,*) "     calc_R function called..."
-        write(*,*) "       x = ", x
+        if (verbose) then
+            write(*,*) "     calc_R function called..."
+            write(*,*) "       x = ", x
+        end if
 
         gravity = gravity_English(this%init_alt)
 
@@ -830,8 +881,10 @@ contains
             y_temp(6) =  cos(x(7))*cos(x(8))
             y_temp(4:6) = y_temp(4:6)*(gravity-a_c)*sin(x(7))*cos(x(8))&
                             /(y_temp(1)*cos(x(8))*cos(x(7)) + y_temp(3)*sin(x(8)))
-            write(*,*) "Updating rotation rates for sct"
-            write(*,*) "   rot_rates", y_temp(4:6)*180/pi
+            if (verbose) then
+                write(*,*) "Updating rotation rates for sct"
+                write(*,*) "   rot_rates", y_temp(4:6)*180/pi
+            end if
         end if
         
 
@@ -853,13 +906,14 @@ contains
             last = last+1
             call this%pseudo_aero(y_temp, F, M)
             call this%mass_inertia(y_temp, mass, I)
-            write(*,*) "F: ", F
             load_factor = (F(1)*sin(alpha) - F(3)*cos(alpha))/(mass*(gravity-a_c))
-            write(*,*) "  Load Factor: ", load_factor
+            if (verbose) write(*,*) "  Load Factor: ", load_factor
             R(last) = this%trim%load_factor - load_factor
         end if
 
-        write(*,*) "      R = ", R
+        if (verbose) write(*,*) "      R = ", R
+
+        this%states = y_temp
 
 
     end function aircraft_calc_R
@@ -878,49 +932,6 @@ contains
 
     end function calc_R_demo
 
-    !function aircraft_calc_R(this, V, H, rot_rates, G, var, theta, psi, solve_bank) result(R)
-
-        !implicit none
-        !class(aircraft), intent(inout) :: this
-        !real, intent(in) :: V, H, G(6), rot_rates(3), var, theta, psi
-        !logical, intent(in) :: solve_bank
-        !real :: alpha, beta, phi
-        !real :: R(6)
-
-        !real :: y_temp(13), dy_dt(13)
-
-
-        !! Parse G
-        !alpha = G(1)
-        !if (solve_bank) then
-            !beta = var
-            !phi = G(2)
-        !else
-            !beta = G(2)
-            !phi = var
-        !end if
-        !this%controls = G(3:6)
-
-        !! Set state
-        !y_temp = 0.0
-
-        !y_temp(1) = V*cos(alpha)*cos(beta)
-        !y_temp(2) = V*sin(beta)
-        !y_temp(3) = V*sin(alpha)*cos(beta)
-        !y_temp(4) = rot_rates(1)
-        !y_temp(5) = rot_rates(2)
-        !y_temp(6) = rot_rates(3)
-
-        !y_temp(9) = -H
-
-        !y_temp(10:13) = euler_to_quat((/phi, theta, psi/))
-
-        !! Run diff_eq
-        !dy_dt = this%diff_eq( y_temp)
-        
-        !R = dy_dt(1:6)
-
-    !end function aircraft_calc_R
 
     function aircraft_runge_kutta(this, y_0, dt) result(y)
 
@@ -1367,12 +1378,12 @@ contains
     end subroutine aircraft_pseudo_aero
 
 
-    function aircraft_tick_states(this, dt) result(new_states)
+    subroutine aircraft_tick_states(this, time, dt)
 
         implicit none
         
         class(aircraft), intent(inout) :: this
-        real, intent(in) :: dt
+        real, intent(in) :: dt, time
         real :: y(13), y1(13)
 
 
@@ -1386,9 +1397,9 @@ contains
 
             y1 = this%runge_kutta(y, dt)
 
-            if (geographic_model_ID > 0) call this%update_geographics(y,y1)
-
             this%states = y1
+
+            if (geographic_model_ID > 0) call this%update_geographics(y,y1)
 
             if (verbose) then
                 write(*,*) " State at end of RK4."
@@ -1397,18 +1408,35 @@ contains
             end if
             call quat_norm(this%states(10:13))
 
+            !if (abs(time+dt-32900.0)<1.e-4.or.abs(time+dt-65800.0)<1.e-4&
+                !.or.abs(time+dt-98700.0)<1.e-4.or.abs(time+dt-131600.0)<1.e-4) then
+            if (save_states) then
+
+                this%init_eul = quat_to_euler(this%states(10:13))
+                write(io_unit,'(ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12, &
+                                A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12)') &
+                                    time+dt,',',y1(1),',',y1(2),',',y1(3),',',y1(4),',',y1(5),',' &
+                                    ,y1(6),',',y1(7),',',y1(8),',',y1(9),',',y1(10),',',y1(11),',',y1(12),',',y1(13),',' &
+                                    ,this%latitude*180./pi,',',this%longitude*180/pi,',',this%init_eul(3)*180/pi
+            end if
+
         end if
 
-    end function aircraft_tick_states
+    end subroutine aircraft_tick_states
+
 
 
     subroutine aircraft_update_geographics(this, y1, y2)
         implicit none
         class(aircraft), intent(inout) :: this
-        real, intent(in) :: y1(13), y2(13)
+        real, intent(inout) :: y1(13), y2(13)
 
         real :: d, dx, dy, dz
-        real :: H1
+        real :: H1, Phi1, Psi1, cP, sP, theta, cT, sT, g1, cg, sg
+        real :: xhat, yhat, zhat, xhp, yhp, zhp, rhat
+        real :: Phi2, Psi2
+        real :: Chat, Shat, dg, quat(4)
+
 
         dx = y2(7) - y1(7)
         dy = y2(8) - y1(8)
@@ -1419,9 +1447,46 @@ contains
         if (d < 1e-12) then
             
         else
-            H1 = -y2(9)
+            H1 = -y1(9)
+            Phi1 = this%latitude
+            Psi1 = this%longitude
+            cP = cos(Phi1)
+            sP = sin(Phi1)
+
+            theta = d/(r_e/0.3048 + H1 - 0.5*dz)
+            sT = sin(theta)
+
+            g1 = atan2(dy, dx)
+            cg = cos(g1)
+            sg = sin(g1)
+
+            xhat = cP*cT - sP*sT*cg
+            yhat = sT*sg
+            zhat = sP*cT + cP*sT*cg
+
+            xhp = -cP*sT - sP*cT*cg
+            yhp = cT*sg
+            zhp = -sP*sT + cP*cT*cg
+            rhat = sqrt(xhat**2 + yhat**2)
+
+            this%latitude = atan2(zhat, rhat)
+            this%longitude = Psi1 + atan2(yhat, xhat)
+
+            Chat = xhat**2*zhp
+            Shat = (xhat*yhp - yhat*xhp)*cos(this%latitude)**2*cos(this%longitude - Psi1)**2
+            dg = atan2(Shat, Chat) - g1
+
+            if (this%longitude > pi) this%longitude = this%longitude - 2.0*pi
+            if (this%longitude <-pi) this%longitude = this%longitude + 2.0*pi
 
 
+            cg = cos(0.5*dg)
+            sg = sin(0.5*dg)
+            quat(1) = -this%states(13)
+            quat(2) = -this%states(12)
+            quat(3) = this%states(11)
+            quat(4) = this%states(10)
+            this%states(10:13) = cg*this%states(10:13) + sg*quat(:)
         end if
 
     end subroutine
