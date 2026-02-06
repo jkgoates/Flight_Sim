@@ -278,6 +278,7 @@ contains
         call jsonx_get(j_initial, "Euler_angles[deg]", this%init_eul)
         this%init_eul = this%init_eul*PI/180.
         this%latitude = this%latitude*PI/180.
+        this%longitude = this%longitude*PI/180.
 
         ! Get type of initialization
         call jsonx_get(j_initial, "type", init_type)
@@ -426,7 +427,7 @@ contains
         if (this%trim%type == 'sct') then
             call json_get(j_trim, 'load_factor', this%trim%load_factor, found)
             if (found) then
-                x(7) = -acos(cos(x(8))/this%trim%load_factor)
+                x(7) = acos(cos(x(8))/this%trim%load_factor)
                 this%trim%solve_load_factor = .true.
                 this%trim%free_vars(7) = .true.
             end if
@@ -444,16 +445,19 @@ contains
 
         x = this%newtons_method(n_free, x, idx_free)
 
-        write(*,*) "final"
-        write(*,*) "alpha[deg] =", x(1)*180/pi
-        write(*,*) "beta[deg]  =", x(2)*180/pi
-        write(*,*) "da[deg]    =", x(3)*180/pi
-        write(*,*) "de[deg]    =", x(4)*180/pi
-        write(*,*) "dr[deg]    =", x(5)*180/pi
-        write(*,*) "throttle   =", x(6)
-        write(*,*) "phi[deg]   =", x(7)*180/pi
-        write(*,*) "theta[deg] =", x(8)*180/pi
-        write(*,*) "psi[deg]   =", x(9)*180/pi
+        write(*,*) "Initial Trim State"
+        write(*,'(A,ES20.12)') "    alpha[deg] =", x(1)*180/pi
+        write(*,'(A,ES20.12)') "    beta[deg]  =", x(2)*180/pi
+        write(*,'(A,ES20.12)') "    p[deg/s]   =", this%states(4)*180/pi
+        write(*,'(A,ES20.12)') "    q[deg/s]   =", this%states(5)*180/pi
+        write(*,'(A,ES20.12)') "    r[deg/s]   =", this%states(6)*180/pi
+        write(*,'(A,ES20.12)') "    da[deg]    =", x(3)*180/pi
+        write(*,'(A,ES20.12)') "    de[deg]    =", x(4)*180/pi
+        write(*,'(A,ES20.12)') "    dr[deg]    =", x(5)*180/pi
+        write(*,'(A,ES20.12)') "    throttle   =", x(6)
+        write(*,'(A,ES20.12)') "    phi[deg]   =", x(7)*180/pi
+        write(*,'(A,ES20.12)') "    theta[deg] =", x(8)*180/pi
+        write(*,'(A,ES20.12)') "    psi[deg]   =", x(9)*180/pi
 
         !this%states = 0.0
 
@@ -774,7 +778,6 @@ contains
         R = this%calc_R(temp_x, N)
         err = maxval(abs(R))
 
-        write(*,'(I10, 10ES20.12)') iter, err, x(1:5)*180.0/pi, x(6), x(7:9)*180/PI
 
         do while (err > this%trim%tol)
             iter = iter + 1
@@ -1455,6 +1458,7 @@ contains
 
             theta = d/(r_e/0.3048 + H1 - 0.5*dz)
             sT = sin(theta)
+            cT = cos(theta)
 
             g1 = atan2(dy, dx)
             cg = cos(g1)
