@@ -296,7 +296,7 @@ contains
 
         if (save_states .and. this%run_physics) then
             write(io_unit,'(ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12, &
-                            A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12)') &
+                            A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.7,A,ES20.7,A,ES20.7)') &
                                 0.0,',',this%states(1),',',this%states(2),',',this%states(3),','&
                                 ,this%states(4),',',this%states(5),',' &
                                 ,this%states(6),',',this%states(7),',',this%states(8),',',this%states(9),','&
@@ -446,18 +446,18 @@ contains
         x = this%newtons_method(n_free, x, idx_free)
 
         write(*,*) "Initial Trim State"
-        write(*,'(A,ES20.12)') "    alpha[deg] =", x(1)*180/pi
-        write(*,'(A,ES20.12)') "    beta[deg]  =", x(2)*180/pi
-        write(*,'(A,ES20.12)') "    p[deg/s]   =", this%states(4)*180/pi
-        write(*,'(A,ES20.12)') "    q[deg/s]   =", this%states(5)*180/pi
-        write(*,'(A,ES20.12)') "    r[deg/s]   =", this%states(6)*180/pi
-        write(*,'(A,ES20.12)') "    da[deg]    =", x(3)*180/pi
-        write(*,'(A,ES20.12)') "    de[deg]    =", x(4)*180/pi
-        write(*,'(A,ES20.12)') "    dr[deg]    =", x(5)*180/pi
-        write(*,'(A,ES20.12)') "    throttle   =", x(6)
-        write(*,'(A,ES20.12)') "    phi[deg]   =", x(7)*180/pi
-        write(*,'(A,ES20.12)') "    theta[deg] =", x(8)*180/pi
-        write(*,'(A,ES20.12)') "    psi[deg]   =", x(9)*180/pi
+        write(*,'(A,ES15.7)') "    alpha[deg] =", x(1)*180/pi
+        write(*,'(A,ES15.7)') "    beta[deg]  =", x(2)*180/pi
+        write(*,'(A,ES15.7)') "    p[deg/s]   =", this%states(4)*180/pi
+        write(*,'(A,ES15.7)') "    q[deg/s]   =", this%states(5)*180/pi
+        write(*,'(A,ES15.7)') "    r[deg/s]   =", this%states(6)*180/pi
+        write(*,'(A,ES15.7)') "    da[deg]    =", x(3)*180/pi
+        write(*,'(A,ES15.7)') "    de[deg]    =", x(4)*180/pi
+        write(*,'(A,ES15.7)') "    dr[deg]    =", x(5)*180/pi
+        write(*,'(A,ES15.7)') "    throttle   =", x(6)
+        write(*,'(A,ES15.7)') "    phi[deg]   =", x(7)*180/pi
+        write(*,'(A,ES15.7)') "    theta[deg] =", x(8)*180/pi
+        write(*,'(A,ES15.7)') "    psi[deg]   =", x(9)*180/pi
 
         !this%states = 0.0
 
@@ -1417,7 +1417,7 @@ contains
 
                 this%init_eul = quat_to_euler(this%states(10:13))
                 write(io_unit,'(ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12, &
-                                A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12)') &
+                                A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.7,A,ES20.7,A,ES20.7)') &
                                     time+dt,',',y1(1),',',y1(2),',',y1(3),',',y1(4),',',y1(5),',' &
                                     ,y1(6),',',y1(7),',',y1(8),',',y1(9),',',y1(10),',',y1(11),',',y1(12),',',y1(13),',' &
                                     ,this%latitude*180./pi,',',this%longitude*180/pi,',',this%init_eul(3)*180/pi
