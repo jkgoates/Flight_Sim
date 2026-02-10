@@ -210,25 +210,50 @@
                     }
                 }
             },
-            "xinitial" : {
-                "airspeed[ft/s]" : 6582.91440687328,
-                "altitude[ft]" : 60000,
-                "latitude[deg]" : 0.0,
-                "longitude[deg]" : 0.0,
-                "Euler_angles[deg]" : [0.0, 0.0, 45.0],
-                "type" : "trim",
-                "trim" : {
-                    "type" : "sct",
-                    "relative_climb_angle[deg]" : 0.0,
-                    "_sideslip_angle[deg]" : -10.0,
-                    "_load_factor" : 1.2,
-                    "solver" : {
-                        "finite_difference_step_size" : 0.01,
-                        "relaxation_factor" : 0.9,
-                        "tolerance" : 1.0e-14,
-                        "max_iterations" : 1000,
-                        "verbose" : true
-                    }
+            "control_effectors": {
+                "1": {
+                    "name": "aileron",
+                    "units": "deg",
+                    "dynamics_order": 2,
+                    "magnitude_limits": [-21.5, 21.5],
+                    "rate_limits[/s]": [-80.0, 80.0],
+                    "acceleration_limits[/s^2]" : [-1000.0, 1000.0],
+                    "time_constants[s]": 0.05,
+                    "natural_frequency[rad/s]" : 20.0,
+                    "damping_ratio": 0.7
+                },
+                "2": {
+                    "name": "elevator",
+                    "units": "deg",
+                    "dynamics_order": 2,
+                    "magnitude_limits": [-25.0, 25.0],
+                    "rate_limits[/s]": [-60.0, 60.0],
+                    "acceleration_limits[/s^2]" : [-1000.0, 1000.0],
+                    "time_constants[s]": 0.05,
+                    "natural_frequency[rad/s]" : 20.0,
+                    "damping_ratio": 0.7
+                },
+                "3": {
+                    "name": "rudder",
+                    "units": "deg",
+                    "dynamics_order": 2,
+                    "magnitude_limits": [-30.0, 30.0],
+                    "rate_limits[/s]": [-120.0, 120.0],
+                    "acceleration_limits[/s^2]" : [-1000.0, 1000.0],
+                    "time_constants[s]": 0.05,
+                    "natural_frequency[rad/s]" : 20.0,
+                    "damping_ratio": 0.7
+                },
+                "4": {
+                    "name": "throttle",
+                    "units": "deg",
+                    "dynamics_order": 2,
+                    "magnitude_limits": [0.0, 1.0],
+                    "rate_limits[/s]": [-1.0, 1.0],
+                    "acceleration_limits[/s^2]" : [-1.0, 1.0],
+                    "time_constants[s]": 3.0,
+                    "natural_frequency[rad/s]" : 20.0,
+                    "damping_ratio": 0.7
                 }
             },
             "initial" : {
@@ -240,14 +265,12 @@
                 "type" : "trim",
                 "state" : {
                     "angle_of_attack[deg]" : 11.278107537468,
-                    "sideslip_angle[deg]" : 0.022727214169,
-                    "p[deg/s]" : -0.766207504385,
-                    "q[deg/s]" : 3.834356702909,
-                    "r[deg/s]" : 3.834356702909,
-                    "aileron[deg]" : 0.123007387668,
-                    "elevator[deg]" : -11.389397552606,
-                    "rudder[deg]" : -0.871269845919,
-                    "throttle" : 0.129524457808
+                    "sideslip_angle[deg]" : 0.0,
+                    "p[deg/s]" : 0.0,
+                    "q[deg/s]" : 0.0,
+                    "r[deg/s]" : 0.0,
+                    "controls": [0.0, -9.439213266902, 0.0, 0.074041048286]
+                    
                 },
                 "trim" : {
                     "type" : "sct",

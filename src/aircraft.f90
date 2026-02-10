@@ -20,17 +20,34 @@ module vehicle_m
         real :: climb_angle, load_factor
         logical, allocatable :: free_vars(:)
     end type trim_settings_t
+
+    type control_t
+        character(len=:), allocatable :: name
+        character(len=:), allocatable :: units
+        integer :: dynamics_order, state_ID
+        real :: commanded_value 
+        real, allocatable :: mag_limit(:), rate_limit(:), accel_limit(:)
+        real :: time_constant, nat_freq, damp_ratio
+        real :: display_units = 1.0
+    end type control_t
     
     type :: aircraft
         
         character(:), allocatable :: type
         type(json_value), pointer :: j_vehicle
         logical :: run_physics
+        logical :: limit_controls = .true.
+
+        ! mass and inertia
         real :: M, Ixx, Iyy, Izz, Ixy, Iyz, Ixz ! Mass and Inertia matrix
         real, dimension(:), allocatable :: CG_shift ! CG shift from reference point (ft)
         real, allocatable :: h(:) ! Gyroscopic components
+
+        ! thrust
         real :: T0, a ! Thrust parameters
         real, dimension(:), allocatable :: t_location, t_orientation
+
+        ! aerodynamic constants
         real :: S_w, b, c ! Reference area, span, chord
         real :: CL_0, CL_alpha, CL_alphahat, CL_qbar, CL_de ! Lift coefficients
         real :: CS_beta, CS_pbar, CS_alpha_pbar, CS_rbar, CS_da, CS_dr ! Side force coefficients
@@ -40,6 +57,11 @@ module vehicle_m
         real :: Cn_beta, Cn_pbar, Cn_alpha_pbar, Cn_rbar, Cn_da, Cn_alpha_da, Cn_dr ! Yawing moment coefficients
         ! real :: rho0
 
+        ! stall model constants
+        type(stall_settings_t) :: CD_stall, CL_stall, Cm_stall
+        logical :: include_stall
+
+        ! landing gear
         real, allocatable :: ks(:), kd(:) ! Landing gear spring and damping coefficients
         real, allocatable :: g_b(:,:) ! Landing gear body fixed coordinates
         real, allocatable :: th_b(:) ! tail hook location
@@ -47,16 +69,14 @@ module vehicle_m
         logical :: ag_engaged
         real, allocatable :: collision_points(:,:) ! Aircraft collision points
     
-        real :: init_V, init_alt, init_states
+        real :: init_V, init_alt
         real, allocatable :: init_eul(:)
 
-        real :: latitude, longitude
-
-        type(stall_settings_t) :: CD_stall, CL_stall, Cm_stall
         type(trim_settings_t) :: trim
-        logical :: include_stall
 
-        real :: states(13), controls(4)
+        real :: states(21), init_states(21)
+        type(control_t) :: controls(4)
+        real :: latitude, longitude
 
     contains
 
