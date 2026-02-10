@@ -1,7 +1,7 @@
 {
     "simulation" : {
         "time_step[s]" : 0.01,
-        "end_time[s]" : 10.0,
+        "end_time[s]" : 60.0,
         "rk4_verbose" : false,
         "save_states" : true,
         "geographic_model": "sphere"
@@ -234,9 +234,9 @@
             "initial" : {
                 "airspeed[ft/s]" : 550,
                 "altitude[ft]" : 30000,
-                "latitude[deg]" : 89.99,
-                "longitude[deg]" : 45.0,
-                "Euler_angles[deg]" : [0.0, 0.0, 0.0],
+                "latitude[deg]" : 80.0,
+                "longitude[deg]" : 90.0,
+                "Euler_angles[deg]" : [0.0, 0.0, 45.0],
                 "type" : "trim",
                 "state" : {
                     "angle_of_attack[deg]" : 11.278107537468,
@@ -252,7 +252,7 @@
                 "trim" : {
                     "type" : "sct",
                     "relative_climb_angle[deg]" : 0.0,
-                    "_load_factor" : 1.2,
+                    "load_factor" : 1.2,
                     "solver" : {
                         "finite_difference_step_size" : 0.01,
                         "relaxation_factor" : 0.9,
