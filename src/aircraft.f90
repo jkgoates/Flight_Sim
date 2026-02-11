@@ -107,7 +107,7 @@ contains
         class(aircraft), intent(inout) :: this
         type(json_value), pointer, intent(in) :: settings
 
-        type(json_value), pointer :: reference, coefficients, aerodynamics, p1, p2, j_initial
+        type(json_value), pointer :: reference, coefficients, aerodynamics, p1, p2, j_initial, j_control, j_control_temp
         real, allocatable :: dummy_loc(:)
         integer :: N, cnt, i
         logical :: found
@@ -289,6 +289,17 @@ contains
         !call jsonx_get(p1, "cable_distance[ft]", this%ag_distance)
         !call jsonx_get(p1, "tail_hook[ft]", this%th_b)
         !this%ag_engaged = .false.
+
+        ! Controls
+        call jsonx_get(settings, 'control_effectors', j_control)
+        call jsonx_get(j_control, '1', j_control_temp)
+        call init_control(j_control_temp)
+        call jsonx_get(j_control, '2', j_control_temp)
+        call init_control(j_control_temp)
+        call jsonx_get(j_control, '3', j_control_temp)
+        call init_control(j_control_temp)
+        call jsonx_get(j_control, '4', j_control_temp)
+        call init_control(j_control_temp)
 
         ! State
         call jsonx_get(j_initial, "airspeed[ft/s]", this%init_V)
@@ -508,6 +519,17 @@ contains
         !this%controls = x(3:6)
 
     end subroutine aircraft_init_to_trim
+
+
+    subroutine aircraft_init_control(this, j_control)
+
+        implicit none
+        
+        class(aircraft), intent(inout) :: this
+        type(json_value), pointer, intent(in) :: j_control
+
+    end subroutine aircraft_init_control
+
 
 
     function aircraft_newtons_method (this, N, x, idx_free) result(temp_x)
