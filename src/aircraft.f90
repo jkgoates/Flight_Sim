@@ -76,6 +76,7 @@ module vehicle_m
 
         real :: states(21), init_states(21)
         type(control_t) :: controls(4)
+        integer :: aileron_ID, elevator_ID, rudder_ID, throttle_ID
         real :: latitude, longitude
 
     contains
@@ -97,6 +98,7 @@ module vehicle_m
         procedure :: diff_eq       => aircraft_diff_eq
         procedure :: newtons_method => aircraft_newtons_method
         procedure :: update_geographics => aircraft_update_geographics
+        procedure :: init_control => aircraft_init_control
     
     end type aircraft
     
@@ -293,13 +295,13 @@ contains
         ! Controls
         call jsonx_get(settings, 'control_effectors', j_control)
         call jsonx_get(j_control, '1', j_control_temp)
-        call init_control(j_control_temp)
+        call this%init_control(j_control_temp, 1)
         call jsonx_get(j_control, '2', j_control_temp)
-        call init_control(j_control_temp)
+        call this%init_control(j_control_temp, 2)
         call jsonx_get(j_control, '3', j_control_temp)
-        call init_control(j_control_temp)
+        call this%init_control(j_control_temp, 3)
         call jsonx_get(j_control, '4', j_control_temp)
-        call init_control(j_control_temp)
+        call this%init_control(j_control_temp, 4)
 
         ! State
         call jsonx_get(j_initial, "airspeed[ft/s]", this%init_V)
@@ -344,21 +346,27 @@ contains
         type(json_value), pointer, intent(in) :: j_initial
 
         real :: alpha, beta, p, q, r, da, de, dr, throttle, phi, theta, psi, xf, yf, zf
+        real, allocatable :: temp_controls(:)
+        integer :: i
         
         call jsonx_get(j_initial, "state.angle_of_attack[deg]", alpha, default_value=0.0)
         call jsonx_get(j_initial, "state.sideslip_angle[deg]", beta, default_value=0.0)
         call jsonx_get(j_initial, "state.p[deg/s]", p, default_value=0.0)
         call jsonx_get(j_initial, "state.q[deg/s]", q, default_value=0.0)
         call jsonx_get(j_initial, "state.r[deg/s]", r, default_value =0.0)
-        call jsonx_get(j_initial, "state.aileron[deg]", da, default_value=0.0)
-        call jsonx_get(j_initial, "state.elevator[deg]", de, default_value=0.0)
-        call jsonx_get(j_initial, "state.rudder[deg]", dr, default_value=0.0)
-        call jsonx_get(j_initial, "state.throttle", throttle, default_value=0.0)
+        !call jsonx_get(j_initial, "state.aileron[deg]", da, default_value=0.0)
+        !call jsonx_get(j_initial, "state.elevator[deg]", de, default_value=0.0)
+        !call jsonx_get(j_initial, "state.rudder[deg]", dr, default_value=0.0)
+        !call jsonx_get(j_initial, "state.throttle", throttle, default_value=0.0)
 
-        this%controls(1) = da*PI/180.
-        this%controls(2) = de*PI/180.
-        this%controls(3) = dr*PI/180.
-        this%controls(4) = throttle
+        if (this%type == 'aircraft') then
+            call jsonx_get(j_initial, 'state.controls', temp_controls, 0.0, 4)
+            do i = 1,4
+                this%states(i+13) = temp_controls(i)/this%controls(i)%display_units
+                this%controls(i)%commanded_value = this%states(i+13)
+            end do
+        end if
+
 
         !phi = phi*PI/180.
         !theta = theta*PI/180.
@@ -402,6 +410,8 @@ contains
         real :: x(n_vars)
         logical :: found
         real :: v_f(3), a_c, alpha, beta, gravity
+
+        this%limit_controls = .false.
 
         allocate(this%trim%free_vars(n_vars))
 
@@ -477,18 +487,22 @@ contains
         x = this%newtons_method(n_free, x, idx_free)
 
         write(*,*) "Initial Trim State"
-        write(*,'(A,ES15.7)') "    alpha[deg] =", x(1)*180/pi
-        write(*,'(A,ES15.7)') "    beta[deg]  =", x(2)*180/pi
-        write(*,'(A,ES15.7)') "    p[deg/s]   =", this%states(4)*180/pi
-        write(*,'(A,ES15.7)') "    q[deg/s]   =", this%states(5)*180/pi
-        write(*,'(A,ES15.7)') "    r[deg/s]   =", this%states(6)*180/pi
-        write(*,'(A,ES15.7)') "    da[deg]    =", x(3)*180/pi
-        write(*,'(A,ES15.7)') "    de[deg]    =", x(4)*180/pi
-        write(*,'(A,ES15.7)') "    dr[deg]    =", x(5)*180/pi
-        write(*,'(A,ES15.7)') "    throttle   =", x(6)
-        write(*,'(A,ES15.7)') "    phi[deg]   =", x(7)*180/pi
-        write(*,'(A,ES15.7)') "    theta[deg] =", x(8)*180/pi
-        write(*,'(A,ES15.7)') "    psi[deg]   =", x(9)*180/pi
+        write(*,'(A,    ES15.7)') "    alpha[deg] =", x(1)*180/pi
+        write(*,'(A,    ES15.7)') "    beta[deg]  =", x(2)*180/pi
+        write(*,'(A,    ES15.7)') "    p[deg/s]   =", this%states(4)*180/pi
+        write(*,'(A,    ES15.7)') "    q[deg/s]   =", this%states(5)*180/pi
+        write(*,'(A,    ES15.7)') "    r[deg/s]   =", this%states(6)*180/pi
+        write(*,'(5A,    ES15.7)') "     =",this%controls(1)%name, '[', this%controls(1)%units, '] = ',&
+                                             this%states(14) * this%controls(1)%display_units
+        write(*,'(5A,    ES15.7)') "     =",this%controls(2)%name, '[', this%controls(2)%units, '] = ',&
+                                             this%states(15) * this%controls(2)%display_units
+        write(*,'(5A,    ES15.7)') "     =",this%controls(3)%name, '[', this%controls(3)%units, '] = ',&
+                                             this%states(16) * this%controls(3)%display_units
+        write(*,'(5A,    ES15.7)') "     =",this%controls(4)%name, '[', this%controls(4)%units, '] = ',&
+                                             this%states(17) * this%controls(4)%display_units
+        write(*,'(A,    ES15.7)') "    phi[deg]   =", x(7)*180/pi
+        write(*,'(A,    ES15.7)') "    theta[deg] =", x(8)*180/pi
+        write(*,'(A,    ES15.7)') "    psi[deg]   =", x(9)*180/pi
 
         !this%states = 0.0
 
@@ -518,286 +532,63 @@ contains
 
         !this%controls = x(3:6)
 
+        this%limit_controls = .true.
+
     end subroutine aircraft_init_to_trim
 
 
-    subroutine aircraft_init_control(this, j_control)
+    subroutine aircraft_init_control(this, j_control, ID)
 
         implicit none
         
         class(aircraft), intent(inout) :: this
         type(json_value), pointer, intent(in) :: j_control
+        integer, intent(in) :: ID
+
+
+        call jsonx_get(j_control, 'name', this%controls(ID)%name)
+        write(*,*) '           reading control effector: ', this%controls(ID)%name
+
+        if (this%controls(ID)%name == 'aileron') this%aileron_ID=ID+13
+        if (this%controls(ID)%name == 'elevator') this%elevator_ID=ID+13
+        if (this%controls(ID)%name == 'rudder') this%rudder_ID=ID+13
+        if (this%controls(ID)%name == 'throttle') this%throttle_ID=ID+13
+
+        call jsonx_get(j_control, 'dynamics_order', this%controls(ID)%dynamics_order, 0)
+        call jsonx_get(j_control, 'units', this%controls(ID)%units, 'none')
+        if (this%controls(ID)%units == 'deg') then
+            this%controls(ID)%display_units = 180.0/pi
+        else
+            this%controls(ID)%display_units = 1.0
+        end if
+        call jsonx_get(j_control, 'magnitude_limits', this%controls(ID)%mag_limit, 0.0, 2)
+        this%controls(ID)%mag_limit(:) = this%controls(ID)%mag_limit(:)/this%controls(ID)%display_units
+
+        ! First-Order Dynamics
+        if (this%controls(ID)%dynamics_order == 1) then
+            call jsonx_get(j_control, 'rate_limits[/s]', this%controls(ID)%rate_limit, 0.0, 2)
+            this%controls(ID)%rate_limit(:) = this%controls(ID)%rate_limit(:)/this%controls(ID)%display_units
+
+            call jsonx_get(j_control, 'time_constant[s]', this%controls(ID)%time_constant)
+        end if
+
+        ! Second-Order Dynamics
+        if (this%controls(ID)%dynamics_order == 2) then
+            call jsonx_get(j_control, 'rate_limits[/s]', this%controls(ID)%rate_limit, 0.0, 2)
+            this%controls(ID)%rate_limit(:) = this%controls(ID)%rate_limit(:)/this%controls(ID)%display_units
+            call jsonx_get(j_control, 'acceleration_limits[/s^2]', this%controls(ID)%accel_limit, 0.0, 2)
+            this%controls(ID)%accel_limit(:) = this%controls(ID)%accel_limit(:)/this%controls(ID)%display_units
+
+            call jsonx_get(j_control, 'natural_frequency[rad/s]', this%controls(ID)%nat_freq)
+            call jsonx_get(j_control, 'damping_ratio', this%controls(ID)%damp_ratio)
+        end if
+
+        this%controls(ID)%state_ID = 13 + ID
+
+        this%controls(ID)%commanded_value = 0.0
 
     end subroutine aircraft_init_control
 
-
-    !subroutine aircraft_init_to_trim_old(this, j_initial, V_mag, H)
-
-        !implicit none
-        
-        !class(aircraft), intent(inout) :: this
-        !type(json_value), pointer, intent(in) :: j_initial
-        !real, intent(in) :: V_mag, H
-        !real :: y(13)
-
-        !real :: fd_step, relaxation, tol
-        !integer :: i, k, l, max_iter
-        !character(len=:), allocatable :: trim_type
-        !real :: u, v, w, rot_rates(3), G(6), R(6), R_1(6), R_2(6), J(6,6)
-        !real, dimension(:), allocatable :: dG
-        !real :: alpha, beta, da, de, dr, throttle
-        !real :: phi, theta, psi, var
-        !real :: error, gravity
-        !logical :: found
-        !logical :: solve_bank, solve_elev
-        !real :: gamma, gamma_1, gamma_2
-        !real :: theta_1, theta_2
-
-        !call jsonx_get(j_initial, "trim.type", trim_type)
-        !call jsonx_get(j_initial, "trim.solver.finite_differenc_step_size", fd_step, default_value=0.01)
-        !call jsonx_get(j_initial, "trim.solver.relaxation_factor", relaxation, default_value=0.9)
-        !call jsonx_get(j_initial, "trim.solver.tolerance", tol)
-        !call jsonx_get(j_initial, "trim.solver.max_iterations", max_iter, default_value=100)
-
-        !write(*,*) "Trimming aircraft for ", trim_type
-
-        !write(*,*) "Newton Solver Settings:"
-        !write(*,*) "  --> Finite Difference Step Size = ", fd_step
-        !write(*,*) "  --> Relaxation Factor = ", relaxation
-        !write(*,*) "  --> Tolerance = ", tol
-
-        !gravity = gravity_English(H)
-
-        !! Initialize
-        !G = 0.0
-        !alpha = 0.0
-        !beta = 0.0
-        !gamma = 0.0
-        !phi = 0.0
-        !theta = 0.0
-        !psi = 0.0
-        !u = 0.0
-        !v = 0.0
-        !w = 0.0
-        !rot_rates = 0.0
-
-        !! Check for sideslip angle
-        !call json_get(j_initial, "trim.bank_angle[deg]", phi, found)
-        !if (.not. found) then
-            !if (trim_type == "shss") then
-                !call json_get(j_initial, "trim.sideslip[deg]", beta, found)
-                !if (.not. found) then
-                    !write(*,*) "User must specify a bank or sideslip angle. Quitting..."
-                    !stop
-                !else
-                    !beta = beta*PI/180.
-                    !solve_bank = .true.
-                !end if
-            !else
-                !write(*,*) "User must specify a bank angle. Quitting..."
-                !stop
-            !end if
-        !else
-            !phi = phi*PI/180.
-            !solve_bank = .false.
-        !end if
-
-        !! Check for elevation angle
-        !call json_get(j_initial, "trim.elevation_angle[deg]", theta, found)
-        !if (.not. found) then
-            !theta = 0.0
-            !call json_get(j_initial, "trim.climb_angle[deg]", gamma, found)
-            !if (.not. found) then
-                !solve_elev = .false.
-                !write(*,*) "User must specify a elevation or climb angle. Quitting..."
-                !stop
-            !else
-                !gamma = gamma*PI/180.
-                !solve_elev = .true.
-            !end if
-        !else
-            !theta = theta*PI/180.
-            !solve_elev = .false.
-        !end if
-
-        !write(*,*) "Initial theta [deg] = ", theta*180./PI
-        !write(*,*) "Initial gamma [deg] = ", gamma*180./PI
-        !write(*,*) "Initial phi[deg]    = ", phi*180./PI
-        !write(*,*) "Initial beta[deg]   = ", beta*180./PI
-
-        !do i = 1, max_iter
-
-            !! Calculate velocities
-            !u = V_mag*cos(alpha)*cos(beta)
-            !v = V_mag*sin(beta)
-            !w = V_mag*sin(alpha)*cos(beta)
-
-            !if (solve_elev) then
-                !! Calculate elevation angle
-                !write(*,*) "Calculating Elevation angle: "
-                !write(*,*) "phi: ", phi
-                !write(*,*) "gamma: ", gamma
-                !write(*,*) "v_mag: ", V_mag
-                !write(*,*) "u: ", u
-                !write(*,*) "v: ", v
-                !write(*,*) "w: ", w
-                !theta_1 = asin((u*V_mag*sin(gamma) + (v*sin(phi) + w*cos(phi))*sqrt(u**2 + (v*sin(phi) + w*cos(phi))**2 - &
-                                                            !V_mag**2 * sin(gamma)**2))/(u**2 + (v*sin(phi) + w*cos(phi))**2))
-                !theta_2 = asin((u*V_mag*sin(gamma) - (v*sin(phi) + w*cos(phi))*sqrt(u**2 + (v*sin(phi) + w*cos(phi))**2 - &
-                                                            !V_mag**2 * sin(gamma)**2))/(u**2 + (v*sin(phi) + w*cos(phi))**2))
-                !gamma_1 = asin((u*sin(theta_1) - (v*sin(phi) + w*cos(phi))*cos(theta_1))/V_mag)
-                !gamma_2 = asin((u*sin(theta_2) - (v*sin(phi) + w*cos(phi))*cos(theta_2))/V_mag)
-
-                !write(*,*) "    Theta 1: ", theta_1*180./PI
-                !write(*,*) "    Gamma 1: ", gamma_1*180./PI
-                !write(*,*) "    Theta 2: ", theta_2*180./PI
-                !write(*,*) "    Gamma 2: ", gamma_2*180./PI
-
-                !if (abs(gamma_1 - gamma) < 1.e-12) then
-                    !theta = theta_1
-                !else if (abs(gamma_2 - gamma) < 1.e-12) then
-                    !theta = theta_2
-                !else
-                    !write(*,*) "Trim solver could not find correct elevation angle. Quitting..."
-                    !stop
-                !end if
-                !write(*,*) "    Correct theta: ", theta
-            !end if
-
-            !! Calculate rotation rates
-            !if (trim_type == "sct") then
-                !rot_rates(1) = -sin(theta)
-                !rot_rates(2) = sin(phi)*cos(theta)
-                !rot_rates(3) = cos(phi)*cos(theta)
-
-                !rot_rates = rot_rates*gravity*sin(phi)*cos(theta)/(u*cos(theta)*cos(phi) + w*sin(theta))
-
-                !write(*,*) "Updating rotation rates for steady coordinated turn:"
-                !write(*,'(A,ES20.12)') "  --> p [deg/s] = ", rot_rates(1)*180./PI
-                !write(*,'(A,ES20.12)') "  --> q [deg/s] = ", rot_rates(2)*180./PI
-                !write(*,'(A,ES20.12)') "  --> r [deg/s] = ", rot_rates(3)*180./PI
-            !end if
-
-
-            !write(*,*) "G defined as G = [alpha, beta, da, de, dr, throttle]"
-            !write(*,'(A,6ES20.12)') " G = ", G
-            !R = this%calc_R(V_mag, H, rot_rates, G, var, theta, psi, solve_bank)
-            !write(*,'(A,6ES20.12)') " R = ", R
-
-            !! Solve for trim state
-            !!if (found_beta) then
-                !!call newtons_solver(V_mag, H, euler, rot_rates, G, fd_step, relaxation, error, beta)
-            !!else
-                !!call newtons_solver(V_mag, H, euler, rot_rates, G, fd_step, relaxation, error)
-            !!end if
-
-            !! Set condition
-            !if (solve_bank) then
-                !G(2) = phi
-                !var = beta
-            !else
-                !G(2) = beta
-                !var = phi
-            !end if
-
-            !! Assemble Jacobian
-            !do k = 1,6
-                !write(*,*) "Calculating gradient relative to G(", k, ")"
-                !G(k) = G(k) + fd_step
-                !write(*,*) "    Positive Finite Difference Step"
-                !write(*,'(A,6ES20.12)') "        G = ", G
-                !R_1 = this%calc_R(V_mag, H, rot_rates, G, var, theta, psi, solve_bank)
-                !write(*,'(A,6ES20.12)') "        R = ", R_1
-
-                !G(k) = G(k) - 2*fd_step
-                !write(*,*) "    Negative Finite Difference Step"
-                !write(*,'(A,6ES20.12)') "        G = ", G
-                !R_2 = this%calc_R(V_mag, H, rot_rates, G, var, theta, psi, solve_bank)
-                !write(*,'(A,6ES20.12)') "        R = ", R_2
-
-                !do l = 1,6
-                    !J(l,k) = (R_1(l) - R_2(l))/(2*fd_step)
-                !end do
-                !G(k) = G(k) + fd_step
-            !end do
-
-            !write(*,*) "Jacobian J = "
-            !do k = 1,6
-                !write(*,'(6ES20.12)') J(k,:)
-            !end do
-
-            !! Calculate R
-            !R = this%calc_R(V_mag, H, rot_rates, G, var, theta, psi, solve_bank)
-
-            !call lu_solve(6, J, -R, dG)
-
-            !! Update G
-            !G = G + relaxation*dG
-            !if (G(6) < 0.0) G(6) = 0.0
-
-            !write(*,*) 
-            !write(*,'(A,6ES20.12)') "Delta G: ", dG
-            !write(*,'(A,6ES20.12)') "New G:   ", G
-        
-            !! Calculate error
-            !error = maxval(abs(this%calc_R(V_mag, H, rot_rates, G, var, theta, psi, solve_bank)))
-
-
-            !write(*,'(A,I4,A,ES20.12)') "Iteration: ", i, " Error: ", error
-
-            !! Update alpha, beta, and controls
-            !alpha = G(1)
-            !if (solve_bank) then
-                !phi = G(2)
-            !else
-                !beta = G(2)
-            !end if
-            !da = G(3)
-            !de = G(4)
-            !dr = G(5)
-            !throttle = G(6)
-        
-            !if (error < tol) exit
-        !end do 
-
-        !write(*,'(A,ES20.12)') "Alpha (deg): ", alpha*180./PI
-        !write(*,'(A,ES20.12)') "Beta  (deg): ", beta*180./PI
-        !write(*,'(A,ES20.12)') "p     (deg/s): ", rot_rates(1)*180./PI
-        !write(*,'(A,ES20.12)') "q     (deg/s): ", rot_rates(2)*180./PI
-        !write(*,'(A,ES20.12)') "r     (deg/s): ", rot_rates(3)*180./PI
-        !write(*,'(A,ES20.12)') "Phi   (deg): ", phi*180./PI
-        !write(*,'(A,ES20.12)') "Theta (deg): ", theta*180./PI
-        !write(*,'(A,ES20.12)') "da    (deg): ", da*180./PI
-        !write(*,'(A,ES20.12)') "de    (deg): ", de*180./PI
-        !write(*,'(A,ES20.12)') "dr    (deg): ", dr*180./PI
-        !write(*,'(A,ES20.12)') "throttle    : ", throttle
-        !write(*,'(11A20)') "alpha[deg]", "beta[deg]", "p[deg/s]", "q[deg/s]", "r[deg/s]", "phi[deg]", &
-                             !"theta[deg]", "da[deg]", "de[deg]", "dr[deg]", "throttle"
-        !write(*,'(11ES20.12)') alpha*180./PI, beta*180./PI, rot_rates(1)*180./PI, rot_rates(2)*180./PI, &
-                    !rot_rates(3)*180./PI, phi*180./PI, theta*180./PI, da*180./PI, de*180./PI, dr*180./PI, throttle
-
-
-        !! Set initial conditions
-        !this%controls(1) = da
-        !this%controls(2) = de
-        !this%controls(3) = dr
-        !this%controls(4) = throttle
-
-        !this%states = 0.0
-
-        !this%states(1) = V_mag*cos(alpha)*cos(beta)
-        !this%states(2) = V_mag*sin(beta)
-        !this%states(3) = V_mag*sin(alpha)*cos(beta)
-
-
-        !this%states(4) = rot_rates(1)
-        !this%states(5) = rot_rates(2)
-        !this%states(6) = rot_rates(3)
-
-        !this%states(9) = -H
-
-        !this%states(10:13) = euler_to_quat((/phi, theta, psi/))
-    !end subroutine aircraft_init_to_trim_old
 
     function aircraft_newtons_method (this, N, x, idx_free) result(temp_x)
 
@@ -892,8 +683,8 @@ contains
         integer, intent(in) :: N
         real :: R(N)
 
-        integer :: last
-        real :: y_temp(13), alpha, beta, dy_dt(13), gravity, a_c, v_f(3), climb_angle, load_factor, F(3), M(3), mass, I(3,3)
+        integer :: last, i
+        real :: y_temp(21), alpha, beta, dy_dt(21), gravity, a_c, v_f(3), climb_angle, load_factor, F(3), M(3), mass, Inertia(3,3)
 
         if (verbose) then
             write(*,*) "     calc_R function called..."
@@ -933,7 +724,7 @@ contains
         
 
 
-        this%controls = x(3:6)
+        y_temp(14:17) = x(3:6)
 
         dy_dt = this%diff_eq(y_temp)
 
@@ -949,7 +740,7 @@ contains
         if (this%trim%solve_load_factor) then
             last = last+1
             call this%pseudo_aero(y_temp, F, M)
-            call this%mass_inertia(y_temp, mass, I)
+            call this%mass_inertia(y_temp, mass, Inertia)
             load_factor = (F(1)*sin(alpha) - F(3)*cos(alpha))/(mass*(gravity-a_c))
             if (verbose) write(*,*) "  Load Factor: ", load_factor
             R(last) = this%trim%load_factor - load_factor
@@ -959,22 +750,11 @@ contains
 
         this%states = y_temp
 
+        do i = 1,4
+            this%controls(i)%commanded_value = this%states(13+i)
+        end do
 
     end function aircraft_calc_R
-
-    function calc_R_demo(N, x) result(R)
-
-        implicit none
-        
-        integer, intent(in) :: N
-        real, intent(in) :: x(N)
-
-        real :: R(N)
-
-        R(1) = x(2) - x(1)**2 + 5
-        R(2) = x(2) - x(1)**2 - (x(1) - 1)
-
-    end function calc_R_demo
 
 
     function aircraft_runge_kutta(this, y_0, dt) result(y)
@@ -982,10 +762,10 @@ contains
         implicit none
 
         class(aircraft), intent(inout) :: this
-        real, intent(in) :: y_0(13), dt
-        real :: y(13)
+        real, intent(in) :: y_0(21), dt
+        real :: y(21)
 
-        real :: k1(13), k2(13), k3(13), k4(13)
+        real :: k1(21), k2(21), k3(21), k4(21)
 
 
         k1 = this%diff_eq(y_0)
@@ -1002,10 +782,12 @@ contains
         implicit none
         
         class(aircraft), intent(inout) :: this        
-        real, intent(in) :: y(13)
-        real :: dy_dt(13)
+        real, intent(in) :: y(21)
+        real :: dy_dt(21)
 
         real :: mass, I(3,3), F(3), M(3), g, I_inv(3,3), dummy(3), h(3), a_c
+        real :: delta, d_delta, dd_delta, wn, zeta
+        integer :: j
 
         if (verbose) then
             write(*,'(A,13ES20.12)') "y: ", y
@@ -1061,9 +843,50 @@ contains
         dy_dt(11) = 0.5*(  y(10)*y(4) - y(13)*y(5) + y(12)*y(6))
         dy_dt(12) = 0.5*(  y(13)*y(4) + y(10)*y(5) - y(11)*y(6))
         dy_dt(13) = 0.5*(- y(12)*y(4) + y(11)*y(5) + y(10)*y(6))
+
+        do j = 1, 4
+            delta = y(13+j)
+            d_delta = y(17+j)
+            delta = max(min(this%controls(j)%mag_limit(2), delta), this%controls(j)%mag_limit(1))
+
+            select case (this%controls(j)%dynamics_order)
+
+            case(0)
+                d_delta = 0.0
+                dd_delta = 0.0
+            
+            case(1)
+                d_delta = (this%controls(j)%commanded_value - delta)/this%controls(j)%time_constant
+                d_delta = max(min(this%controls(j)%rate_limit(2), d_delta), this%controls(j)%rate_limit(1))
+                if (delta <= this%controls(j)%mag_limit(1) + 1.e-12 .and. d_delta < 0.0) d_delta = 0.0
+                if (delta >= this%controls(j)%mag_limit(2) - 1.e-12 .and. d_delta > 0.0) d_delta = 0.0
+                dd_delta = 0.0
+            case(2)
+                wn = this%controls(j)%nat_freq
+                zeta = this%controls(j)%damp_ratio
+                d_delta = max(min(this%controls(j)%rate_limit(2), d_delta), this%controls(j)%rate_limit(1))
+                if (delta <= this%controls(j)%mag_limit(1) + 1.e-12 .and. d_delta < 0.0) d_delta = 0.0
+                if (delta >= this%controls(j)%mag_limit(2) - 1.e-12 .and. d_delta > 0.0) d_delta = 0.0
+
+                dd_delta = wn**2*(this%controls(j)%commanded_value - delta) - 2.0*zeta*wn*d_delta
+                dd_delta = max(min(this%controls(j)%accel_limit(2), d_delta), this%controls(j)%accel_limit(1))
+
+                if (d_delta <= this%controls(j)%rate_limit(1) + 1.e-12 .and. dd_delta < 0.0) dd_delta = 0.0
+                if (d_delta >= this%controls(j)%rate_limit(2) - 1.e-12 .and. dd_delta > 0.0) dd_delta = 0.0
+
+                if (delta <= this%controls(j)%mag_limit(1) + 1.e-12 &
+                    .and. this%controls(j)%commanded_value <= this%controls(j)%mag_limit(1) + 1.e-12) dd_delta = 0.0
+                if (delta >= this%controls(j)%mag_limit(1) - 1.e-12 &
+                    .and. this%controls(j)%commanded_value >= this%controls(j)%mag_limit(2) - 1.e-12) dd_delta = 0.0
+            end select
+
+            dy_dt(13+j) = d_delta
+            dy_dt(17+j) = dd_delta
+
+        end do
         
         if (verbose) then
-            write(*,'(A,13ES20.12)') "dy_dt: ", dy_dt
+            write(*,'(A,21ES20.12)') "dy_dt: ", dy_dt
             write(*,*) "----------------------"
         end if
 
@@ -1072,7 +895,7 @@ contains
     subroutine aircraft_mass_inertia(this, y, mass, I)
     
         class(aircraft), intent(in) :: this
-        real, intent(in) :: y(13)
+        real, intent(in) :: y(21)
         real, intent(out) :: mass, I(3,3)
 
         real :: E(3,3)
@@ -1096,7 +919,7 @@ contains
     subroutine aircraft_gyroscopic(this, y, h)
     
         class(aircraft), intent(in) :: this
-        real, intent(in) :: y(13)
+        real, intent(in) :: y(21)
         real, intent(out) :: h(3)
         
         h = this%h
@@ -1108,7 +931,7 @@ contains
         implicit none
         
         class(aircraft), intent(in) :: this
-        real, intent(in) :: y(13), throttle
+        real, intent(in) :: y(21), throttle
         
         real :: thrust(3)
 
@@ -1260,7 +1083,7 @@ contains
         implicit none
     
         class(aircraft), intent(inout) :: this
-        real, intent(in) :: y(13)
+        real, intent(in) :: y(21)
         real, intent(out) :: F(3), M(3)
 
         real :: Z, Temp, P, rho, a, mu, Re
@@ -1273,10 +1096,6 @@ contains
         real :: CLnewt, CDnewt, Cmnewt, pos, neg, sigma
 
         !print*, "State vector incoming: ", y
-        da = this%controls(1)
-        de = this%controls(2)
-        dr = this%controls(3)
-        throttle = this%controls(4)
 
         ! Get atmosphere
         call std_atm_English(-y(9), Z, temp, P, rho, a)
@@ -1296,6 +1115,18 @@ contains
         !beta = atan2(y(2),y(1))
 
         if (this%type == 'aircraft') then
+            if (this%limit_controls) then
+                da       = max(this%controls(1)%mag_limit(1), min(this%controls(1)%mag_limit(2), y(this%aileron_ID)))
+                de       = max(this%controls(2)%mag_limit(1), min(this%controls(2)%mag_limit(2), y(this%elevator_ID)))
+                dr       = max(this%controls(3)%mag_limit(1), min(this%controls(3)%mag_limit(2), y(this%rudder_ID)))
+                throttle = max(this%controls(4)%mag_limit(1), min(this%controls(4)%mag_limit(2), y(this%throttle_ID)))
+            else
+                da = y(this%aileron_ID)
+                de = y(this%elevator_ID)
+                dr = y(this%rudder_ID)
+                throttle = y(this%throttle_ID)
+            end if
+
             ! Calculate aerodynamic coefficients
             C_L1 = this%CL_0 + this%CL_alpha*alpha
             C_L = C_L1 + this%CL_qbar*qbar + this%CL_alphahat*alphahat + this%CL_de*de
@@ -1421,14 +1252,14 @@ contains
         
     end subroutine aircraft_pseudo_aero
 
-
     subroutine aircraft_tick_states(this, time, dt)
 
         implicit none
         
         class(aircraft), intent(inout) :: this
         real, intent(in) :: dt, time
-        real :: y(13), y1(13)
+        real :: y(21), y1(21)
+        integer :: i
 
 
         if (this%run_physics) then
@@ -1440,6 +1271,11 @@ contains
             y = this%states
 
             y1 = this%runge_kutta(y, dt)
+
+            do i = 1, 4
+                y1(13+i) = max(min(y1(13+i), this%controls(i)%mag_limit(2)), this%controls(i)%mag_limit(1))
+                y1(17+i) = max(min(y1(17+i), this%controls(i)%rate_limit(2)), this%controls(i)%rate_limit(1))
+            end do
 
             this%states = y1
 
@@ -1543,7 +1379,7 @@ contains
         class(aircraft), intent(inout) :: this
         real, intent(in) :: V, H
         integer :: i, iunit
-        real :: alpha, beta, states(13), F(3), M(3), Ax, N, Y
+        real :: alpha, beta, states(21), F(3), M(3), Ax, N, Y
         real :: ca, cb, sa, sb
         real :: CL, CD, Cm
         real :: Z,T,P,rho,a, mu, const
