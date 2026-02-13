@@ -43,7 +43,9 @@ contains
 
         if (save_states) then
             open(newunit=io_unit, file='sim_output.csv', status='replace', action='write')
-            write(io_unit,*) 'time[s], u[ft/s], v[ft/s], w[ft/s], p[rad/s], q[rad/s], r[rad/s], xf[ft], yf[ft], zf[ft], e0, ex, ey, ez, lat, long, azimuth'
+            write(io_unit,*) 'time[s], u[ft/s], v[ft/s], w[ft/s], p[rad/s], q[rad/s], r[rad/s], xf[ft], yf[ft], zf[ft], &
+                                e0, ex, ey, ez,c1[deg], c2[deg], c3[deg], c4, &
+                                c1dot[deg/s], c2dot[deg/s], c3dot[deg/s], c4dot[/s], lat, long, azimuth'
         end if
 
         ! Initialize vehicles
@@ -60,7 +62,7 @@ contains
         do i = 1, N
             call json_value_get(p1, i, p2)
             if (p2%name(1:1) == 'x') cycle
-            call vehicles(i)%init(p2)
+            call vehicles(cnt)%init(p2)
             cnt = cnt+1
         end do
 

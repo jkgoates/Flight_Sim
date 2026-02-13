@@ -1,13 +1,13 @@
 {
     "simulation" : {
         "time_step[s]" : 0.01,
-        "end_time[s]" : 60.0,
+        "end_time[s]" : 1.0,
         "rk4_verbose" : false,
         "save_states" : true,
         "geographic_model": "sphere"
     },
     "vehicles" : {
-        "ping-pong-ball" : {
+        "xping-pong-ball" : {
             "type" : "sphere",
             "run_physics" : false,
             "mass" : {
@@ -40,7 +40,7 @@
                 }
             }
         },
-        "arrow" : {
+        "xarrow" : {
             "type" : "arrow",
             "run_physics" : false,
             "mass" : {
@@ -218,7 +218,7 @@
                     "magnitude_limits": [-21.5, 21.5],
                     "rate_limits[/s]": [-80.0, 80.0],
                     "acceleration_limits[/s^2]" : [-1000.0, 1000.0],
-                    "time_constants[s]": 0.05,
+                    "time_constant[s]": 0.05,
                     "natural_frequency[rad/s]" : 20.0,
                     "damping_ratio": 0.7
                 },
@@ -229,7 +229,7 @@
                     "magnitude_limits": [-25.0, 25.0],
                     "rate_limits[/s]": [-60.0, 60.0],
                     "acceleration_limits[/s^2]" : [-1000.0, 1000.0],
-                    "time_constants[s]": 0.05,
+                    "time_constant[s]": 0.05,
                     "natural_frequency[rad/s]" : 20.0,
                     "damping_ratio": 0.7
                 },
@@ -240,28 +240,28 @@
                     "magnitude_limits": [-30.0, 30.0],
                     "rate_limits[/s]": [-120.0, 120.0],
                     "acceleration_limits[/s^2]" : [-1000.0, 1000.0],
-                    "time_constants[s]": 0.05,
+                    "time_constant[s]": 0.05,
                     "natural_frequency[rad/s]" : 20.0,
                     "damping_ratio": 0.7
                 },
                 "4": {
                     "name": "throttle",
-                    "units": "deg",
+                    "units": "none",
                     "dynamics_order": 2,
                     "magnitude_limits": [0.0, 1.0],
                     "rate_limits[/s]": [-1.0, 1.0],
                     "acceleration_limits[/s^2]" : [-1.0, 1.0],
-                    "time_constants[s]": 3.0,
-                    "natural_frequency[rad/s]" : 20.0,
-                    "damping_ratio": 0.7
+                    "time_constant[s]": 3.0,
+                    "natural_frequency[rad/s]" : 1.5,
+                    "damping_ratio": 1.0
                 }
             },
             "initial" : {
-                "airspeed[ft/s]" : 550,
-                "altitude[ft]" : 30000,
-                "latitude[deg]" : 80.0,
-                "longitude[deg]" : 90.0,
-                "Euler_angles[deg]" : [0.0, 0.0, 45.0],
+                "airspeed[ft/s]" : 500,
+                "altitude[ft]" : 10000,
+                "latitude[deg]" : 0.0,
+                "longitude[deg]" : 0.0,
+                "Euler_angles[deg]" : [40.0, 0.0, 0.0],
                 "type" : "trim",
                 "state" : {
                     "angle_of_attack[deg]" : 11.278107537468,
@@ -273,9 +273,9 @@
                     
                 },
                 "trim" : {
-                    "type" : "sct",
-                    "relative_climb_angle[deg]" : 0.0,
-                    "load_factor" : 1.2,
+                    "type" : "shss",
+                    "relative_climb_angle[deg]" : 45.0,
+                    "_load_factor" : 1.0,
                     "solver" : {
                         "finite_difference_step_size" : 0.01,
                         "relaxation_factor" : 0.9,

@@ -93,6 +93,7 @@ module vehicle_m
         !procedure :: arresting_gear => aircraft_arresting_gear
         procedure :: print_aero_table => aircraft_print_aero_table
         procedure :: tick_states => aircraft_tick_states
+        procedure :: save_states => aircraft_save_states
         procedure :: calc_R        => aircraft_calc_R
         procedure :: runge_kutta => aircraft_runge_kutta
         procedure :: diff_eq       => aircraft_diff_eq
@@ -294,13 +295,13 @@ contains
 
         ! Controls
         call jsonx_get(settings, 'control_effectors', j_control)
-        call jsonx_get(j_control, '1', j_control_temp)
+        call json_get(j_control, '1', j_control_temp)
         call this%init_control(j_control_temp, 1)
-        call jsonx_get(j_control, '2', j_control_temp)
+        call json_get(settings, 'control_effectors.2', j_control_temp)
         call this%init_control(j_control_temp, 2)
-        call jsonx_get(j_control, '3', j_control_temp)
+        call json_get(settings, 'control_effectors.3', j_control_temp)
         call this%init_control(j_control_temp, 3)
-        call jsonx_get(j_control, '4', j_control_temp)
+        call json_get(settings, 'control_effectors.4', j_control_temp)
         call this%init_control(j_control_temp, 4)
 
         ! State
@@ -328,13 +329,14 @@ contains
         end select
 
         if (save_states .and. this%run_physics) then
-            write(io_unit,'(ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12, &
-                            A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.7,A,ES20.7,A,ES20.7)') &
-                                0.0,',',this%states(1),',',this%states(2),',',this%states(3),','&
-                                ,this%states(4),',',this%states(5),',' &
-                                ,this%states(6),',',this%states(7),',',this%states(8),',',this%states(9),','&
-                                ,this%states(10),',',this%states(11),',',this%states(12),',',this%states(13),',' &
-                                ,this%latitude*180/pi,',',this%longitude*180/pi, ',', this%init_eul(3)*180/pi
+            call this%save_states(this%states, 0.0, 0.0)
+            !write(io_unit,'(ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12, &
+                            !A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.7,A,ES20.7,A,ES20.7)') &
+                                !0.0,',',this%states(1),',',this%states(2),',',this%states(3),','&
+                                !,this%states(4),',',this%states(5),',' &
+                                !,this%states(6),',',this%states(7),',',this%states(8),',',this%states(9),','&
+                                !,this%states(10),',',this%states(11),',',this%states(12),',',this%states(13),',' &
+                                !,this%latitude*180/pi,',',this%longitude*180/pi, ',', this%init_eul(3)*180/pi
         end if
 
     end subroutine aircraft_init
@@ -546,7 +548,7 @@ contains
         integer, intent(in) :: ID
 
 
-        call jsonx_get(j_control, 'name', this%controls(ID)%name)
+        call jsonx_get(j_control, 'name', this%controls(ID)%name, 'none')
         write(*,*) '           reading control effector: ', this%controls(ID)%name
 
         if (this%controls(ID)%name == 'aileron') this%aileron_ID=ID+13
@@ -750,9 +752,9 @@ contains
 
         this%states = y_temp
 
-        do i = 1,4
-            this%controls(i)%commanded_value = this%states(13+i)
-        end do
+        !do i = 1,4
+            !this%controls(i)%commanded_value = this%states(13+i)
+        !end do
 
     end function aircraft_calc_R
 
@@ -869,7 +871,7 @@ contains
                 if (delta >= this%controls(j)%mag_limit(2) - 1.e-12 .and. d_delta > 0.0) d_delta = 0.0
 
                 dd_delta = wn**2*(this%controls(j)%commanded_value - delta) - 2.0*zeta*wn*d_delta
-                dd_delta = max(min(this%controls(j)%accel_limit(2), d_delta), this%controls(j)%accel_limit(1))
+                dd_delta = max(min(this%controls(j)%accel_limit(2), dd_delta), this%controls(j)%accel_limit(1))
 
                 if (d_delta <= this%controls(j)%rate_limit(1) + 1.e-12 .and. dd_delta < 0.0) dd_delta = 0.0
                 if (d_delta >= this%controls(j)%rate_limit(2) - 1.e-12 .and. dd_delta > 0.0) dd_delta = 0.0
@@ -1274,7 +1276,9 @@ contains
 
             do i = 1, 4
                 y1(13+i) = max(min(y1(13+i), this%controls(i)%mag_limit(2)), this%controls(i)%mag_limit(1))
-                y1(17+i) = max(min(y1(17+i), this%controls(i)%rate_limit(2)), this%controls(i)%rate_limit(1))
+                if (this%controls(i)%dynamics_order > 0) then
+                    y1(17+i) = max(min(y1(17+i), this%controls(i)%rate_limit(2)), this%controls(i)%rate_limit(1))
+                end if
             end do
 
             this%states = y1
@@ -1291,18 +1295,37 @@ contains
             !if (abs(time+dt-32900.0)<1.e-4.or.abs(time+dt-65800.0)<1.e-4&
                 !.or.abs(time+dt-98700.0)<1.e-4.or.abs(time+dt-131600.0)<1.e-4) then
             if (save_states) then
-
-                this%init_eul = quat_to_euler(this%states(10:13))
-                write(io_unit,'(ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12, &
-                                A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.7,A,ES20.7,A,ES20.7)') &
-                                    time+dt,',',y1(1),',',y1(2),',',y1(3),',',y1(4),',',y1(5),',' &
-                                    ,y1(6),',',y1(7),',',y1(8),',',y1(9),',',y1(10),',',y1(11),',',y1(12),',',y1(13),',' &
-                                    ,this%latitude*180./pi,',',this%longitude*180/pi,',',this%init_eul(3)*180/pi
+                call this%save_states(this%states, time, dt)
+                !this%init_eul = quat_to_euler(this%states(10:13))
+                !write(io_unit,'(ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12, &
+                                !A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.7,A,ES20.7,A,ES20.7)') &
+                                    !time+dt,',',y1(1),',',y1(2),',',y1(3),',',y1(4),',',y1(5),',' &
+                                    !,y1(6),',',y1(7),',',y1(8),',',y1(9),',',y1(10),',',y1(11),',',y1(12),',',y1(13),',' &
+                                    !,this%latitude*180./pi,',',this%longitude*180/pi,',',this%init_eul(3)*180/pi
             end if
 
         end if
 
     end subroutine aircraft_tick_states
+
+
+    subroutine aircraft_save_states(this, y, time, dt)
+        implicit none
+        
+        class(aircraft), intent(inout) :: this
+        real, intent(in) :: time, dt, y(21)
+        real :: eul(3)
+        integer :: i
+
+
+        eul = quat_to_euler(y(10:13))
+        write(io_unit, *) time+dt, ',', &
+            (y(i), ',', i=1,13), &
+            (y(13+i)*this%controls(i)%display_units, ',', i=1,4) ,&
+            (y(17+i)*this%controls(i)%display_units, ',', i=1,4) , &
+            this%latitude*180.0/pi, ',', this%longitude*180.0/pi,',', eul(3)*180/pi
+
+    end subroutine aircraft_save_states
 
 
 
