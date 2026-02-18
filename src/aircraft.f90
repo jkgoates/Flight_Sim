@@ -752,9 +752,9 @@ contains
 
         this%states = y_temp
 
-        !do i = 1,4
-            !this%controls(i)%commanded_value = this%states(13+i)
-        !end do
+        do i = 1,4
+            this%controls(i)%commanded_value = this%states(13+i)
+        end do
 
     end function aircraft_calc_R
 
