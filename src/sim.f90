@@ -3,7 +3,6 @@ module sim_m
     use vehicle_m
     use jsonx_m
     use micro_time_m
-    use connection_m
 
     implicit none
     
@@ -11,7 +10,6 @@ module sim_m
 
     type(json_value), pointer :: j_main
 
-    type(connection) :: graphics, controls_conn
     real :: s(13)
 
     ! NOTES FROM DR. HUNSAKERS CODE
@@ -47,6 +45,8 @@ contains
                                 e0, ex, ey, ez,c1[deg], c2[deg], c3[deg], c4, &
                                 c1dot[deg/s], c2dot[deg/s], c3dot[deg/s], c4dot[/s], lat, long, azimuth'
         end if
+        
+        call udp_initialize()         ! for windows users
 
         ! Initialize vehicles
         call jsonx_get(j_main, "vehicles", p1)
@@ -67,7 +67,6 @@ contains
         end do
 
 
-        call udp_initialize()         ! for windows users
 
         
     end subroutine init

@@ -2,6 +2,7 @@ module vehicle_m
     use goates_m
     use linalg_mod
     use jsonx_m
+    use connection_m
 
     implicit none
 
@@ -79,6 +80,9 @@ module vehicle_m
         integer :: aileron_ID, elevator_ID, rudder_ID, throttle_ID
         real :: latitude, longitude
 
+        ! Connections
+        type(connection) :: states_conn, controls_conn, datalog_conn
+
     contains
 
         procedure :: mass_inertia   => aircraft_mass_inertia
@@ -110,7 +114,7 @@ contains
         class(aircraft), intent(inout) :: this
         type(json_value), pointer, intent(in) :: settings
 
-        type(json_value), pointer :: reference, coefficients, aerodynamics, p1, p2, j_initial, j_control, j_control_temp
+        type(json_value), pointer :: reference, coefficients, aerodynamics, p1, p2, j_initial, j_control, j_control_temp, j_conn
         real, allocatable :: dummy_loc(:)
         integer :: N, cnt, i
         logical :: found
@@ -123,6 +127,7 @@ contains
         call jsonx_get(settings, "initial", j_initial)
         call jsonx_get(settings, "aerodynamics", aerodynamics)
         call jsonx_get(aerodynamics, "reference", reference)
+        call jsonx_get(settings, "connections", j_conn)
 
         call jsonx_get(settings, "run_physics", this%run_physics)
         call jsonx_get(settings, "type", this%type)
@@ -338,6 +343,18 @@ contains
                                 !,this%states(10),',',this%states(11),',',this%states(12),',',this%states(13),',' &
                                 !,this%latitude*180/pi,',',this%longitude*180/pi, ',', this%init_eul(3)*180/pi
         end if
+
+        ! Initialize Connections
+        write(*,*) "Initializing connections..."
+        call jsonx_get(j_conn, "states", p1)
+        call this%states_conn%init(p1)
+        write(*,*) "states connection initialized"
+        call jsonx_get(j_conn, "controls", p1)
+        call this%controls_conn%init(p1)
+        write(*,*) "controls connection initialized"
+        call jsonx_get(j_conn, "datalog", p1)
+        call this%datalog_conn%init(p1)
+        write(*,*) "datalog connection initialized"
 
     end subroutine aircraft_init
 
@@ -1260,7 +1277,8 @@ contains
         
         class(aircraft), intent(inout) :: this
         real, intent(in) :: dt, time
-        real :: y(21), y1(21)
+        real :: y(21), y1(21), dummy(13)
+        real :: controls_dummy(4)
         integer :: i
 
 
@@ -1303,6 +1321,16 @@ contains
                                     !,y1(6),',',y1(7),',',y1(8),',',y1(9),',',y1(10),',',y1(11),',',y1(12),',',y1(13),',' &
                                     !,this%latitude*180./pi,',',this%longitude*180/pi,',',this%init_eul(3)*180/pi
             end if
+
+            dummy(1) = time+dt
+            dummy(2:10) = this%states(1:9)
+            dummy(11:13) = quat_to_euler(this%states(10:13))
+            call this%states_conn%send(dummy)
+
+            controls_dummy = this%controls_conn%recv()
+            do i = 1, 4
+                this%controls(i)%commanded_value = controls_dummy(i)
+            end do
 
         end if
 

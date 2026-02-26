@@ -1,6 +1,6 @@
 {
     "simulation" : {
-        "time_step[s]" : 0.01,
+        "time_step[s]" : 0.0,
         "end_time[s]" : 10.0,
         "rk4_verbose" : false,
         "save_states" : true,
@@ -258,8 +258,8 @@
             },
             "initial" : {
                 "airspeed[ft/s]" : 550,
-                "altitude[ft]" : 30000,
-                "latitude[deg]" : 89.99,
+                "altitude[ft]" : 500,
+                "latitude[deg]" : 0.0,
                 "longitude[deg]" : 45,
                 "Euler_angles[deg]" : [0.0, 0.0, 0.0],
                 "type" : "trim",
@@ -283,6 +283,29 @@
                         "max_iterations" : 1000,
                         "verbose" : true
                     }
+                }
+            },
+            "connections": {
+                "datalog": {
+                    "type": "send",
+                    "number_of_values": 22,
+                    "refresh_rate": 100,
+                    "channel_type": "file",
+                    "filename": "datalog.csv"
+                },
+                "states": {
+                    "type": "send",
+                    "channel_type": "udp",
+                    "number_of_values": 13,
+                    "refresh_rate": 1000,
+                    "port_ID": 5006
+                },
+                "controls":{
+                    "type": "receive",
+                    "channel_type": "udp",
+                    "number_of_values": 4,
+                    "refresh_rate": 30,
+                    "port_ID": 5007
                 }
             }
         }
