@@ -380,7 +380,7 @@ if __name__ == '__main__':
     print("Done.")
 
     graphics_conn = connection(input_dict["connections"]["receive_states"])
-    controls_conn = connection(input_dict["connections"]["send_controls"])
+    #controls_conn = connection(input_dict["connections"]["send_controls"])
 
     fig = plt.figure(figsize=(cam.AR*5.0, 5.0))
     ax = fig.add_subplot(111)
@@ -437,7 +437,7 @@ if __name__ == '__main__':
         fig.canvas.flush_events()
 
         controls = [aileron, elevator, rudder, throttle]
-        #controls_conn.send(controls)
+       # controls_conn.send(controls)
 
         cnt += 1
         if cnt == 50:

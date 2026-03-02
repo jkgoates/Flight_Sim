@@ -81,7 +81,7 @@ module vehicle_m
         real :: latitude, longitude
 
         ! Connections
-        type(connection) :: states_conn, controls_conn, datalog_conn
+        type(connection) :: states_conn, controls_conn, datalog_conn, graphics_conn
 
     contains
 
@@ -354,6 +354,9 @@ contains
         write(*,*) "controls connection initialized"
         call jsonx_get(j_conn, "datalog", p1)
         call this%datalog_conn%init(p1)
+        write(*,*) "datalog connection initialized"
+        call jsonx_get(j_conn, "graphics", p1)
+        call this%graphics_conn%init(p1)
         write(*,*) "datalog connection initialized"
 
     end subroutine aircraft_init
@@ -895,7 +898,7 @@ contains
 
                 if (delta <= this%controls(j)%mag_limit(1) + 1.e-12 &
                     .and. this%controls(j)%commanded_value <= this%controls(j)%mag_limit(1) + 1.e-12) dd_delta = 0.0
-                if (delta >= this%controls(j)%mag_limit(1) - 1.e-12 &
+                if (delta >= this%controls(j)%mag_limit(2) - 1.e-12 &
                     .and. this%controls(j)%commanded_value >= this%controls(j)%mag_limit(2) - 1.e-12) dd_delta = 0.0
             end select
 
@@ -1277,7 +1280,7 @@ contains
         
         class(aircraft), intent(inout) :: this
         real, intent(in) :: dt, time
-        real :: y(21), y1(21), dummy(13)
+        real :: y(21), y1(21), dummy(13), dummy_full(22)
         real :: controls_dummy(4)
         integer :: i
 
@@ -1293,6 +1296,9 @@ contains
             y1 = this%runge_kutta(y, dt)
 
             do i = 1, 4
+                if (this%controls(i)%dynamics_order == 0) then
+                    y1(13+i) = this%controls(i)%commanded_value
+                end if
                 y1(13+i) = max(min(y1(13+i), this%controls(i)%mag_limit(2)), this%controls(i)%mag_limit(1))
                 if (this%controls(i)%dynamics_order > 0) then
                     y1(17+i) = max(min(y1(17+i), this%controls(i)%rate_limit(2)), this%controls(i)%rate_limit(1))
@@ -1313,7 +1319,10 @@ contains
             !if (abs(time+dt-32900.0)<1.e-4.or.abs(time+dt-65800.0)<1.e-4&
                 !.or.abs(time+dt-98700.0)<1.e-4.or.abs(time+dt-131600.0)<1.e-4) then
             if (save_states) then
-                call this%save_states(this%states, time, dt)
+                dummy_full(1) = time+dt
+                dummy_full(2:22) = this%states(1:21)
+                call this%datalog_conn%send(dummy_full)
+                !call this%save_states(this%states, time, dt)
                 !this%init_eul = quat_to_euler(this%states(10:13))
                 !write(io_unit,'(ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12, &
                                 !A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.7,A,ES20.7,A,ES20.7)') &
@@ -1326,6 +1335,7 @@ contains
             dummy(2:10) = this%states(1:9)
             dummy(11:13) = quat_to_euler(this%states(10:13))
             call this%states_conn%send(dummy)
+            call this%graphics_conn%send(dummy)
 
             controls_dummy = this%controls_conn%recv()
             do i = 1, 4
