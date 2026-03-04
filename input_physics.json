@@ -1,7 +1,7 @@
 {
     "simulation" : {
         "time_step[s]" : 0.0,
-        "end_time[s]" : 10.0,
+        "end_time[s]" : 60.0,
         "rk4_verbose" : false,
         "save_states" : true,
         "geographic_model": "sphere"
@@ -247,9 +247,9 @@
                 "4": {
                     "name": "throttle",
                     "units": "none",
-                    "dynamics_order": 1,
+                    "dynamics_order": 2,
                     "magnitude_limits": [0.0, 1.0],
-                    "rate_limits[/s]": [-0.0, 0.0],
+                    "rate_limits[/s]": [-1.0, 1.0],
                     "acceleration_limits[/s^2]" : [-1.0, 1.0],
                     "time_constant[s]": 3.0,
                     "natural_frequency[rad/s]" : 1.5,
@@ -261,7 +261,7 @@
                 "altitude[ft]" : 1000,
                 "latitude[deg]" : 0.0,
                 "longitude[deg]" : 45,
-                "Euler_angles[deg]" : [20.0, 0.0, 0.0],
+                "Euler_angles[deg]" : [0.0, 0.0, 0.0],
                 "type" : "trim",
                 "state" : {
                     "angle_of_attack[deg]" : 11.278107537468,
