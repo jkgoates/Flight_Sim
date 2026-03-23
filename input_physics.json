@@ -1,7 +1,7 @@
 {
     "simulation" : {
         "time_step[s]" : 0.01,
-        "end_time[s]" : 10.0,
+        "end_time[s]" : 9.99999999,
         "rk4_verbose" : false,
         "save_states" : true,
         "geographic_model": "none"
@@ -13,7 +13,7 @@
             "wingspan[ft]": 30.0,
             "hstab_distance[ft]": 15.0,
             "vstab_distance[ft]": 15.0,
-            "intensity": "moderate",
+            "intensity": "severe",
             "repeatable": false,
             "xsample": {
                 "save_filename": "turb_sample.csv",
@@ -283,15 +283,15 @@
                 "altitude[ft]" : 3000,
                 "latitude[deg]" : 0.0,
                 "longitude[deg]" : 45,
-                "Euler_angles[deg]" : [0.0, 0.0, 0.0],
-                "type" : "trim",
+                "Euler_angles[deg]" : [0.0, 7.973921791130, 0.0],
+                "type" : "state",
                 "state" : {
-                    "angle_of_attack[deg]" : 11.278107537468,
+                    "angle_of_attack[deg]" : 7.973921791130,
                     "sideslip_angle[deg]" : 0.0,
                     "p[deg/s]" : 0.0,
                     "q[deg/s]" : 0.0,
                     "r[deg/s]" : 0.0,
-                    "controls": [0.0, -9.439213266902, 0.0, 0.074041048286]
+                    "controls": [0.0, -9.2585355737, 0.0, 0.07553867486]
                     
                 },
                 "trim" : {

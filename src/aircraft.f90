@@ -348,19 +348,19 @@ contains
         end if
 
         ! Initialize Connections
-        write(*,*) "Initializing connections..."
-        call jsonx_get(j_conn, "states", p1)
-        call this%states_conn%init(p1)
-        write(*,*) "states connection initialized"
-        call jsonx_get(j_conn, "controls", p1)
-        call this%controls_conn%init(p1)
-        write(*,*) "controls connection initialized"
-        call jsonx_get(j_conn, "datalog", p1)
-        call this%datalog_conn%init(p1)
-        write(*,*) "datalog connection initialized"
-        call jsonx_get(j_conn, "graphics", p1)
-        call this%graphics_conn%init(p1)
-        write(*,*) "datalog connection initialized"
+        !write(*,*) "Initializing connections..."
+        !call jsonx_get(j_conn, "states", p1)
+        !call this%states_conn%init(p1)
+        !write(*,*) "states connection initialized"
+        !call jsonx_get(j_conn, "controls", p1)
+        !call this%controls_conn%init(p1)
+        !write(*,*) "controls connection initialized"
+        !call jsonx_get(j_conn, "datalog", p1)
+        !call this%datalog_conn%init(p1)
+        !write(*,*) "datalog connection initialized"
+        !call jsonx_get(j_conn, "graphics", p1)
+        !call this%graphics_conn%init(p1)
+        !write(*,*) "datalog connection initialized"
 
         this%atmosphere%prev_xyz(:) = this%states(7:9)
 
@@ -385,6 +385,7 @@ contains
         !call jsonx_get(j_initial, "state.elevator[deg]", de, default_value=0.0)
         !call jsonx_get(j_initial, "state.rudder[deg]", dr, default_value=0.0)
         !call jsonx_get(j_initial, "state.throttle", throttle, default_value=0.0)
+        this%states = 0.0
 
         if (this%type == 'aircraft') then
             call jsonx_get(j_initial, 'state.controls', temp_controls, 0.0, 4)
@@ -403,7 +404,6 @@ contains
         alpha = alpha *PI/180.
         beta  = beta  *PI/180.
 
-        this%states = 0.0
 
         this%states(1) = this%init_V*cos(alpha)*cos(beta)
         this%states(2) = this%init_V*sin(beta)
@@ -515,22 +515,22 @@ contains
         x = this%newtons_method(n_free, x, idx_free)
 
         write(*,*) "Initial Trim State"
-        write(*,'(A,    ES15.7)') "    alpha[deg] =", x(1)*180/pi
-        write(*,'(A,    ES15.7)') "    beta[deg]  =", x(2)*180/pi
-        write(*,'(A,    ES15.7)') "    p[deg/s]   =", this%states(4)*180/pi
-        write(*,'(A,    ES15.7)') "    q[deg/s]   =", this%states(5)*180/pi
-        write(*,'(A,    ES15.7)') "    r[deg/s]   =", this%states(6)*180/pi
-        write(*,'(5A,    ES15.7)') "     =",this%controls(1)%name, '[', this%controls(1)%units, '] = ',&
-                                             this%states(14) * this%controls(1)%display_units
-        write(*,'(5A,    ES15.7)') "     =",this%controls(2)%name, '[', this%controls(2)%units, '] = ',&
-                                             this%states(15) * this%controls(2)%display_units
-        write(*,'(5A,    ES15.7)') "     =",this%controls(3)%name, '[', this%controls(3)%units, '] = ',&
-                                             this%states(16) * this%controls(3)%display_units
-        write(*,'(5A,    ES15.7)') "     =",this%controls(4)%name, '[', this%controls(4)%units, '] = ',&
-                                             this%states(17) * this%controls(4)%display_units
-        write(*,'(A,    ES15.7)') "    phi[deg]   =", x(7)*180/pi
-        write(*,'(A,    ES15.7)') "    theta[deg] =", x(8)*180/pi
-        write(*,'(A,    ES15.7)') "    psi[deg]   =", x(9)*180/pi
+        write(*,'(A,    ES20.12)') "    alpha[deg] =", x(1)*180/pi
+        write(*,'(A,    ES20.12)') "    beta[deg]  =", x(2)*180/pi
+        write(*,'(A,    ES20.12)') "    p[deg/s]   =", this%states(4)*180/pi
+        write(*,'(A,    ES20.12)') "    q[deg/s]   =", this%states(5)*180/pi
+        write(*,'(A,    ES20.12)') "    r[deg/s]   =", this%states(6)*180/pi
+        write(*,'(5A,   ES20.12)') "     =",this%controls(1)%name, '[', this%controls(1)%units, '] = ',&
+                                         this%states(14) * this%controls(1)%display_units
+        write(*,'(5A,   ES20.12)') "     =",this%controls(2)%name, '[', this%controls(2)%units, '] = ',&
+                                         this%states(15) * this%controls(2)%display_units
+        write(*,'(5A,   ES20.12)') "     =",this%controls(3)%name, '[', this%controls(3)%units, '] = ',&
+                                         this%states(16) * this%controls(3)%display_units
+        write(*,'(5A,   ES20.12)') "     =",this%controls(4)%name, '[', this%controls(4)%units, '] = ',&
+                                         this%states(17) * this%controls(4)%display_units
+        write(*,'(A,    ES20.12)') "    phi[deg]   =", x(7)*180/pi
+        write(*,'(A,    ES20.12)') "    theta[deg] =", x(8)*180/pi
+        write(*,'(A,    ES20.12)') "    psi[deg]   =", x(9)*180/pi
 
         !this%states = 0.0
 
@@ -1336,8 +1336,10 @@ contains
             if (save_states) then
                 dummy_full(1) = time+dt
                 dummy_full(2:22) = this%states(1:21)
-                call this%datalog_conn%send(dummy_full)
-                call this%save_states(this%states, time, dt)
+                !call this%datalog_conn%send(dummy_full)
+                if (time > 0.0) then
+                    call this%save_states(this%states, time, dt)
+                end if
                 !this%init_eul = quat_to_euler(this%states(10:13))
                 !write(io_unit,'(ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12, &
                                 !A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.7,A,ES20.7,A,ES20.7)') &
@@ -1349,13 +1351,13 @@ contains
             dummy(1) = time+dt
             dummy(2:10) = this%states(1:9)
             dummy(11:13) = quat_to_euler(this%states(10:13))
-            call this%states_conn%send(dummy)
-            call this%graphics_conn%send(dummy)
+            !call this%states_conn%send(dummy)
+            !call this%graphics_conn%send(dummy)
 
-            controls_dummy = this%controls_conn%recv()
-            do i = 1, 4
-                this%controls(i)%commanded_value = controls_dummy(i)
-            end do
+            !controls_dummy = this%controls_conn%recv()
+            !do i = 1, 4
+                !this%controls(i)%commanded_value = controls_dummy(i)
+            !end do
 
         end if
 
