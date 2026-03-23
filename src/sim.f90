@@ -23,7 +23,7 @@ contains
         implicit none
         
         character(len=100), intent(in) :: filename
-        type(json_value), pointer :: j_aircraft, j_initial, p1, p2
+        type(json_value), pointer :: j_aircraft, j_initial, p1, p2, j_atmosphere
         real, dimension(:), allocatable :: euler
         real :: alpha, beta, p, q, r
         real :: da, de, dr, throttle
@@ -38,6 +38,8 @@ contains
         call jsonx_get(j_main, "simulation.geographic_model", geographic_model, default_value='none')
         geographic_model_ID = 0
         if (geographic_model == 'sphere') geographic_model_ID = 1
+
+        call jsonx_get(j_main, "atmosphere", j_atmosphere)
 
         if (save_states) then
             open(newunit=io_unit, file='sim_output.csv', status='replace', action='write')
@@ -62,6 +64,7 @@ contains
         do i = 1, N
             call json_value_get(p1, i, p2)
             if (p2%name(1:1) == 'x') cycle
+            call atmosphere_init(vehicles(cnt)%atmosphere, j_atmosphere)
             call vehicles(cnt)%init(p2)
             cnt = cnt+1
         end do

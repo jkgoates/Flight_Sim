@@ -1,10 +1,28 @@
 {
     "simulation" : {
-        "time_step[s]" : 0.0,
-        "end_time[s]" : 60.0,
+        "time_step[s]" : 0.01,
+        "end_time[s]" : 10.0,
         "rk4_verbose" : false,
         "save_states" : true,
         "geographic_model": "sphere"
+    },
+    "atmosphere": {
+        "constant_wind[ft/s]": [0.0,0.0,0.0],
+        "turbulence": {
+            "model": "dryden_beal",
+            "wingspan[ft]": 30.0,
+            "hstab_distance[ft]": 15.0,
+            "vstab_distance[ft]": 15.0,
+            "intensity": "moderate",
+            "repeatable": false,
+            "xsample": {
+                "save_filename": "turb_sample.csv",
+                "height_above_ground[ft]": 2000,
+                "number_of_points": 80000,
+                "dx[ft]": 5,
+                "psd_analyses": 10
+            }
+        }
     },
     "vehicles" : {
         "xping-pong-ball" : {
@@ -214,9 +232,10 @@
                 "1": {
                     "name": "aileron",
                     "units": "deg",
-                    "dynamics_order": 2,
+                    "dynamics_order": 1,
                     "magnitude_limits": [-21.5, 21.5],
-                    "rate_limits[/s]": [-80.0, 80.0],
+                    "xrate_limits[/s]": [-80.0, 80.0],
+                    "rate_limits[/s]": [0.0, 0.0],
                     "acceleration_limits[/s^2]" : [-1000.0, 1000.0],
                     "time_constant[s]": 0.05,
                     "natural_frequency[rad/s]" : 20.0,
@@ -225,9 +244,10 @@
                 "2": {
                     "name": "elevator",
                     "units": "deg",
-                    "dynamics_order": 2,
+                    "dynamics_order": 1,
                     "magnitude_limits": [-25.0, 25.0],
-                    "rate_limits[/s]": [-60.0, 60.0],
+                    "xrate_limits[/s]": [-60.0, 60.0],
+                    "rate_limits[/s]": [0.0, 0.0],
                     "acceleration_limits[/s^2]" : [-1000.0, 1000.0],
                     "time_constant[s]": 0.05,
                     "natural_frequency[rad/s]" : 20.0,
@@ -236,9 +256,10 @@
                 "3": {
                     "name": "rudder",
                     "units": "deg",
-                    "dynamics_order": 2,
+                    "dynamics_order": 1,
                     "magnitude_limits": [-30.0, 30.0],
-                    "rate_limits[/s]": [-120.0, 120.0],
+                    "xrate_limits[/s]": [-120.0, 120.0],
+                    "rate_limits[/s]": [0.0, 0.0],
                     "acceleration_limits[/s^2]" : [-1000.0, 1000.0],
                     "time_constant[s]": 0.05,
                     "natural_frequency[rad/s]" : 20.0,
@@ -247,9 +268,10 @@
                 "4": {
                     "name": "throttle",
                     "units": "none",
-                    "dynamics_order": 2,
+                    "dynamics_order": 1,
                     "magnitude_limits": [0.0, 1.0],
-                    "rate_limits[/s]": [-1.0, 1.0],
+                    "xrate_limits[/s]": [-1.0, 1.0],
+                    "rate_limits[/s]": [0.0, 0.0],
                     "acceleration_limits[/s^2]" : [-1.0, 1.0],
                     "time_constant[s]": 3.0,
                     "natural_frequency[rad/s]" : 1.5,
@@ -258,7 +280,7 @@
             },
             "initial" : {
                 "airspeed[ft/s]" : 350,
-                "altitude[ft]" : 1000,
+                "altitude[ft]" : 3000,
                 "latitude[deg]" : 0.0,
                 "longitude[deg]" : 45,
                 "Euler_angles[deg]" : [0.0, 0.0, 0.0],

@@ -3,6 +3,7 @@ module vehicle_m
     use linalg_mod
     use jsonx_m
     use connection_m
+    use atmosphere_m
 
     implicit none
 
@@ -79,6 +80,8 @@ module vehicle_m
         type(control_t) :: controls(4)
         integer :: aileron_ID, elevator_ID, rudder_ID, throttle_ID
         real :: latitude, longitude
+
+        type(atmosphere_t) :: atmosphere
 
         ! Connections
         type(connection) :: states_conn, controls_conn, datalog_conn, graphics_conn
@@ -359,6 +362,8 @@ contains
         call this%graphics_conn%init(p1)
         write(*,*) "datalog connection initialized"
 
+        this%atmosphere%prev_xyz(:) = this%states(7:9)
+
     end subroutine aircraft_init
 
     subroutine aircraft_init_to_state(this, j_initial)
@@ -434,6 +439,7 @@ contains
         real :: v_f(3), a_c, alpha, beta, gravity
 
         this%limit_controls = .false.
+        this%atmosphere%turb_on = .false.
 
         allocate(this%trim%free_vars(n_vars))
 
@@ -555,6 +561,7 @@ contains
         !this%controls = x(3:6)
 
         this%limit_controls = .true.
+        this%atmosphere%turb_on = .true.
 
     end subroutine aircraft_init_to_trim
 
@@ -1112,7 +1119,8 @@ contains
         real :: C_L1, C_L, C_D, C_S, C_ell, C_m, C_n
         real :: de, da, dr, throttle
 
-        real :: alpha, beta, pbar, qbar, rbar, V, alphahat
+        real :: alpha, beta, pbar, qbar, rbar, V_mag, alphahat
+        real :: u, v, w, turb(6)
         real :: S_alpha, C_alpha, S_beta, C_beta
         real :: thrust(3), F_g(3), M_g(3)
         real :: CLnewt, CDnewt, Cmnewt, pos, neg, sigma
@@ -1122,17 +1130,24 @@ contains
         ! Get atmosphere
         call std_atm_English(-y(9), Z, temp, P, rho, a)
         
-        V = sqrt(y(1)**2 + y(2)**2 + y(3)**2)
+        turb = atmosphere_get_turbulence(this%atmosphere, y)
 
-        pbar = (0.5/V)*y(4)*this%b
-        qbar = (0.5/V)*y(5)*this%c
-        rbar = (0.5/V)*y(6)*this%b
+        u = y(1) + turb(1)
+        v = y(2) + turb(2)
+        w = y(3) + turb(3)
+        
+        V_mag = sqrt(u**2 + v**2 + w**2)
 
-        alpha = atan2(y(3),y(1))
-        alphahat = (this%c/(2.0*V))*y(5)
+        pbar = (0.5/V_mag)*(y(4))*this%b
+        qbar = (0.5/V_mag)*(y(5)+turb(5))*this%c
+        rbar = (0.5/V_mag)*(y(6)+turb(6))*this%b
+
+        alpha = atan2(w,u)
+        !alphahat = (this%c/(2.0*V_mag))*(y(5)+turb(5))
+        alphahat = 0.0
 
         ! traditional beta
-        beta = asin(y(2)/V)
+        beta = asin(v/V_mag)
         ! Flank angle
         !beta = atan2(y(2),y(1))
 
@@ -1190,17 +1205,17 @@ contains
                 C_m = (1.0 - sigma)*C_m + sigma*(Cmnewt)
             end if
 
-            F(1) = 0.5*rho*V**2 * this%S_w * (C_L*S_alpha - C_S*C_alpha*S_beta - C_D*C_alpha*C_beta)
-            F(2) = 0.5*rho*V**2 * this%S_w * (C_S*C_beta - C_D*S_beta)
-            F(3) = 0.5*rho*V**2 * this%S_w * (-C_L*C_alpha - C_S*S_alpha*S_beta - C_D*S_alpha*C_beta)
+            F(1) = 0.5*rho*V_mag**2 * this%S_w * (C_L*S_alpha - C_S*C_alpha*S_beta - C_D*C_alpha*C_beta)
+            F(2) = 0.5*rho*V_mag**2 * this%S_w * (C_S*C_beta - C_D*S_beta)
+            F(3) = 0.5*rho*V_mag**2 * this%S_w * (-C_L*C_alpha - C_S*S_alpha*S_beta - C_D*S_alpha*C_beta)
 
-            M(1) = 0.5*rho*V**2 * this%S_w * (this%b*(C_ell))
-            M(2) = 0.5*rho*V**2 * this%S_w * (this%c*C_m)
-            M(3) = 0.5*rho*V**2 * this%S_w * (this%b*(C_n))
+            M(1) = 0.5*rho*V_mag**2 * this%S_w * (this%b*(C_ell))
+            M(2) = 0.5*rho*V_mag**2 * this%S_w * (this%c*C_m)
+            M(3) = 0.5*rho*V_mag**2 * this%S_w * (this%b*(C_n))
 
         else if (this%type == 'arrow') then
 
-            beta = atan2(y(2),y(1))
+            beta = atan2(v,u)
 
             C_L = this%CL_alpha*alpha
             C_S = -this%CL_alpha*beta
@@ -1210,19 +1225,19 @@ contains
             C_m = this%Cm_alpha*alpha + this%Cm_qbar*qbar
             C_n = -this%Cm_alpha*beta + this%Cm_qbar*rbar
 
-            beta = asin(y(2)/V)
+            beta = asin(v/V_mag)
             S_alpha = sin(alpha)
             C_alpha = cos(alpha)
             S_beta = sin(beta)
             C_beta = cos(beta)
 
-            F(1) = 0.5*rho*V**2 * this%S_w * (C_L*S_alpha - C_S*C_alpha*S_beta - C_D*C_alpha*C_beta)
-            F(2) = 0.5*rho*V**2 * this%S_w * (C_S*C_beta - C_D*S_beta)
-            F(3) = 0.5*rho*V**2 * this%S_w * (-C_L*C_alpha - C_S*S_alpha*S_beta - C_D*S_alpha*C_beta)
+            F(1) = 0.5*rho*V_mag**2 * this%S_w * (C_L*S_alpha - C_S*C_alpha*S_beta - C_D*C_alpha*C_beta)
+            F(2) = 0.5*rho*V_mag**2 * this%S_w * (C_S*C_beta - C_D*S_beta)
+            F(3) = 0.5*rho*V_mag**2 * this%S_w * (-C_L*C_alpha - C_S*S_alpha*S_beta - C_D*S_alpha*C_beta)
 
-            M(1) = 0.5*rho*V**2 * this%S_w * (this%b*(C_ell))
-            M(2) = 0.5*rho*V**2 * this%S_w * (this%c*C_m)
-            M(3) = 0.5*rho*V**2 * this%S_w * (this%b*(C_n))
+            M(1) = 0.5*rho*V_mag**2 * this%S_w * (this%b*(C_ell))
+            M(2) = 0.5*rho*V_mag**2 * this%S_w * (this%c*C_m)
+            M(3) = 0.5*rho*V_mag**2 * this%S_w * (this%b*(C_n))
 
         else if (this%type == 'sphere') then
             mu = sutherland_visc_English(temp)
@@ -1242,7 +1257,7 @@ contains
             end if
 
 
-            F = -0.5 * rho * V**2 * PI * this%b**2 * C_D * y(1:3)/V
+            F = -0.5 * rho * V_mag**2 * PI * this%b**2 * C_D * (y(1:3)+turb(1:3))/V_mag
             M = 0.0
 
         end if
@@ -1322,7 +1337,7 @@ contains
                 dummy_full(1) = time+dt
                 dummy_full(2:22) = this%states(1:21)
                 call this%datalog_conn%send(dummy_full)
-                !call this%save_states(this%states, time, dt)
+                call this%save_states(this%states, time, dt)
                 !this%init_eul = quat_to_euler(this%states(10:13))
                 !write(io_unit,'(ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12, &
                                 !A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.7,A,ES20.7,A,ES20.7)') &
