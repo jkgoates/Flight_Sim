@@ -125,7 +125,7 @@ contains
 
         start_time = get_time()
         ! Run simulation
-        do while (t < tf)
+        do while (t < (tf-1e-8))
 
             if (verbose) then
                 write(*,*) 

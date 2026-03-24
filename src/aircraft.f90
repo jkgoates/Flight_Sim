@@ -1138,7 +1138,7 @@ contains
         
         V_mag = sqrt(u**2 + v**2 + w**2)
 
-        pbar = (0.5/V_mag)*(y(4))*this%b
+        pbar = (0.5/V_mag)*(y(4)+turb(4))*this%b
         qbar = (0.5/V_mag)*(y(5)+turb(5))*this%c
         rbar = (0.5/V_mag)*(y(6)+turb(6))*this%b
 

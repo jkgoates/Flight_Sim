@@ -273,7 +273,7 @@ contains
 
         sigma_np = sigma_w*sqrt(0.8*pi*(this%Lw/this%Lb)**(1.0/3.0)/(this%Lw*dx))
         Ap = 0.5*dx/this%Lb
-        ans(4) = ((1.0-Ap)*this%prev_turb(-1,4) + 2.0*Ap*rand_normal()*sigma_np)/(1.0+Ap)
+        ans(4) = ((1.0-Ap)*this%prev_turb(1,4) + 2.0*Ap*rand_normal()*sigma_np)/(1.0+Ap)
 
         this%prev_turb(1,:) = ans(1:3)
 

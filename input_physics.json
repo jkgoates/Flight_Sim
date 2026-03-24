@@ -4,7 +4,7 @@
         "end_time[s]" : 10.0,
         "rk4_verbose" : false,
         "save_states" : true,
-        "geographic_model": "sphere"
+        "geographic_model": "none"
     },
     "atmosphere": {
         "constant_wind[ft/s]": [0.0,0.0,0.0],

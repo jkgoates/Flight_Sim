@@ -95,5 +95,5 @@ if __name__ == "__main__":
         input_file=base_dir /"input_physics.json",
         states_file=base_dir /"sim_output.csv",
         output_file=base_dir /"monte_carlo_final_states.csv",
-        n_runs=1000,
+        n_runs=10000,
     )
