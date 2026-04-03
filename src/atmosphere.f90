@@ -248,7 +248,7 @@ contains
             if (n < 1) n = 1
             write(*,*) "          Turbulence history length = ", n*10
             write(*,*) "                                dx  = ", dx
-            allocate(this%prev_turb(n*10,3))
+            allocate(this%prev_turb(n*10,6))
             allocate(this%prev_xff(n*10))
             this%prev_turb(:,:) = 0.0
             do i = 1, n*10
@@ -275,7 +275,7 @@ contains
         Ap = 0.5*dx/this%Lb
         ans(4) = ((1.0-Ap)*this%prev_turb(1,4) + 2.0*Ap*rand_normal()*sigma_np)/(1.0+Ap)
 
-        this%prev_turb(1,:) = ans(1:3)
+        this%prev_turb(1,1:3) = ans(1:3)
 
         ans(5) =  (ans(3)-interpolate_1D( this%prev_xff, this%prev_turb(:,3),this%hstab_dist))/this%hstab_dist
         ans(6) = -(ans(2)-interpolate_1D( this%prev_xff, this%prev_turb(:,2),this%vstab_dist))/this%vstab_dist
@@ -291,7 +291,7 @@ contains
         !this%prev_xff(2:) = this%prev_xff(1:-1)
         this%prev_xff = this%prev_xff + dx
         this%prev_xff(1) = 0.0
-        this%prev_turb(1,:) = ans(1:3)
+        this%prev_turb(1,4:6) = ans(4:6)
     end function dryden_beal
 
 

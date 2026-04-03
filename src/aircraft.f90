@@ -4,6 +4,7 @@ module vehicle_m
     use jsonx_m
     use connection_m
     use atmosphere_m
+    use database_m
 
     implicit none
 
@@ -57,6 +58,13 @@ module vehicle_m
         real :: Cell_0, Cell_1, Cell_beta, Cell_pbar, Cell_alpha_rbar, Cell_rbar, Cell_da, Cell_dr ! Rolling moment coefficients
         real :: Cm_0, Cm_alpha, Cm_qbar, Cm_alphahat, Cm_de ! Pitching moment coefficients
         real :: Cn_beta, Cn_pbar, Cn_alpha_pbar, Cn_rbar, Cn_da, Cn_alpha_da, Cn_dr ! Yawing moment coefficients
+
+        ! Aerodynamic Database
+        character(len=:), allocatable :: db_path
+        character(len=200), allocatable, dimension(:) :: db_fn(:)
+        type(db_rect), allocatable :: db(:)
+        integer :: n_db
+        real :: speed_brake, le_flap
         ! real :: rho0
 
         ! stall model constants
@@ -85,6 +93,7 @@ module vehicle_m
 
         ! Connections
         type(connection) :: states_conn, controls_conn, datalog_conn, graphics_conn
+
 
     contains
 
@@ -120,11 +129,14 @@ contains
         type(json_value), pointer :: reference, coefficients, aerodynamics, p1, p2, j_initial, j_control, j_control_temp, j_conn
         real, allocatable :: dummy_loc(:)
         integer :: N, cnt, i
-        logical :: found
+        logical :: found, allow_saturation
 
         real :: V, H, lat, long
         real, allocatable :: Euler(:)
         character(len=:), allocatable :: init_type
+
+        ! Database testing
+        real :: alpha, beta, da, de, dr, pbar, qbar, rbar, temp_states(21), F(3), M(3)
 
         ! Parse JSON settings
         call jsonx_get(settings, "initial", j_initial)
@@ -166,54 +178,70 @@ contains
 
         if (this%type == 'aircraft') then
             ! Lift coefficients
-            call jsonx_get(coefficients, "CL.0", this%CL_0)
-            call jsonx_get(coefficients, "CL.alpha", this%CL_alpha)
-            call jsonx_get(coefficients, "CL.alphahat", this%CL_alphahat)
-            call jsonx_get(coefficients, "CL.qbar", this%CL_qbar)
-            call jsonx_get(coefficients, "CL.elevator", this%CL_de)
+            call jsonx_get(coefficients, "CL.0", this%CL_0, 0.0)
+            call jsonx_get(coefficients, "CL.alpha", this%CL_alpha, 0.0)
+            call jsonx_get(coefficients, "CL.alphahat", this%CL_alphahat, 0.0)
+            call jsonx_get(coefficients, "CL.qbar", this%CL_qbar, 0.0)
+            call jsonx_get(coefficients, "CL.elevator", this%CL_de, 0.0)
 
             ! Side force coefficients
-            call jsonx_get(coefficients, "CS.beta", this%CS_beta)
-            call jsonx_get(coefficients, "CS.pbar", this%CS_pbar)
-            call jsonx_get(coefficients, "CS.alpha_pbar", this%CS_alpha_pbar)
-            call jsonx_get(coefficients, "CS.rbar", this%CS_rbar)
-            call jsonx_get(coefficients, "CS.aileron", this%CS_da)
-            call jsonx_get(coefficients, "CS.rudder", this%CS_dr)
+            call jsonx_get(coefficients, "CS.beta", this%CS_beta, 0.0)
+            call jsonx_get(coefficients, "CS.pbar", this%CS_pbar, 0.0)
+            call jsonx_get(coefficients, "CS.alpha_pbar", this%CS_alpha_pbar, 0.0)
+            call jsonx_get(coefficients, "CS.rbar", this%CS_rbar, 0.0)
+            call jsonx_get(coefficients, "CS.aileron", this%CS_da, 0.0)
+            call jsonx_get(coefficients, "CS.rudder", this%CS_dr, 0.0)
 
             ! Drag Coefficients
-            call jsonx_get(coefficients, "CD.L0", this%CD_L0)
-            call jsonx_get(coefficients, "CD.CL1", this%CD_CL1)
-            call jsonx_get(coefficients, "CD.CL1_CL1", this%CD_CL1_CL1)
-            call jsonx_get(coefficients, "CD.CS_CS", this%CD_CS_CS)
-            call jsonx_get(coefficients, "CD.qbar", this%CD_qbar)
-            call jsonx_get(coefficients, "CD.alpha_qbar", this%CD_alpha_qbar)
-            call jsonx_get(coefficients, "CD.elevator", this%CD_de)
-            call jsonx_get(coefficients, "CD.alpha_elevator", this%CD_alpha_de)
-            call jsonx_get(coefficients, "CD.elevator_elevator", this%CD_de_de)
+            call jsonx_get(coefficients, "CD.L0", this%CD_L0, 0.0)
+            call jsonx_get(coefficients, "CD.CL1", this%CD_CL1, 0.0)
+            call jsonx_get(coefficients, "CD.CL1_CL1", this%CD_CL1_CL1, 0.0)
+            call jsonx_get(coefficients, "CD.CS_CS", this%CD_CS_CS, 0.0)
+            call jsonx_get(coefficients, "CD.qbar", this%CD_qbar, 0.0)
+            call jsonx_get(coefficients, "CD.alpha_qbar", this%CD_alpha_qbar, 0.0)
+            call jsonx_get(coefficients, "CD.elevator", this%CD_de, 0.0)
+            call jsonx_get(coefficients, "CD.alpha_elevator", this%CD_alpha_de, 0.0)
+            call jsonx_get(coefficients, "CD.elevator_elevator", this%CD_de_de, 0.0)
 
             ! Rolling moment coefficients
-            call jsonx_get(coefficients, "Cl.beta", this%Cell_beta)
-            call jsonx_get(coefficients, "Cl.pbar", this%Cell_pbar)
-            call jsonx_get(coefficients, "Cl.alpha_rbar", this%Cell_alpha_rbar)
-            call jsonx_get(coefficients, "Cl.rbar", this%Cell_rbar)
-            call jsonx_get(coefficients, "Cl.aileron", this%Cell_da)
-            call jsonx_get(coefficients, "Cl.rudder", this%Cell_dr)
+            call jsonx_get(coefficients, "Cl.beta", this%Cell_beta, 0.0)
+            call jsonx_get(coefficients, "Cl.pbar", this%Cell_pbar, 0.0)
+            call jsonx_get(coefficients, "Cl.alpha_rbar", this%Cell_alpha_rbar, 0.0)
+            call jsonx_get(coefficients, "Cl.rbar", this%Cell_rbar, 0.0)
+            call jsonx_get(coefficients, "Cl.aileron", this%Cell_da, 0.0)
+            call jsonx_get(coefficients, "Cl.rudder", this%Cell_dr, 0.0)
 
             ! Pitching moment coefficients
-            call jsonx_get(coefficients, "Cm.0", this%Cm_0)
-            call jsonx_get(coefficients, "Cm.alpha", this%Cm_alpha)
-            call jsonx_get(coefficients, "Cm.qbar", this%Cm_qbar)
-            call jsonx_get(coefficients, "Cm.alphahat", this%Cm_alphahat)
-            call jsonx_get(coefficients, "Cm.elevator", this%Cm_de)
+            call jsonx_get(coefficients, "Cm.0", this%Cm_0, 0.0)
+            call jsonx_get(coefficients, "Cm.alpha", this%Cm_alpha, 0.0)
+            call jsonx_get(coefficients, "Cm.qbar", this%Cm_qbar, 0.0)
+            call jsonx_get(coefficients, "Cm.alphahat", this%Cm_alphahat, 0.0)
+            call jsonx_get(coefficients, "Cm.elevator", this%Cm_de, 0.0)
 
             ! Yawing moment coefficients
-            call jsonx_get(coefficients, "Cn.beta", this%Cn_beta)
-            call jsonx_get(coefficients, "Cn.pbar", this%Cn_pbar)
-            call jsonx_get(coefficients, "Cn.alpha_pbar", this%Cn_alpha_pbar)
-            call jsonx_get(coefficients, "Cn.rbar", this%Cn_rbar)
-            call jsonx_get(coefficients, "Cn.aileron", this%Cn_da)
-            call jsonx_get(coefficients, "Cn.alpha_aileron", this%Cn_alpha_da)
-            call jsonx_get(coefficients, "Cn.rudder", this%Cn_dr)
+            call jsonx_get(coefficients, "Cn.beta", this%Cn_beta, 0.0)
+            call jsonx_get(coefficients, "Cn.pbar", this%Cn_pbar, 0.0)
+            call jsonx_get(coefficients, "Cn.alpha_pbar", this%Cn_alpha_pbar, 0.0)
+            call jsonx_get(coefficients, "Cn.rbar", this%Cn_rbar, 0.0)
+            call jsonx_get(coefficients, "Cn.aileron", this%Cn_da, 0.0)
+            call jsonx_get(coefficients, "Cn.alpha_aileron", this%Cn_alpha_da, 0.0)
+            call jsonx_get(coefficients, "Cn.rudder", this%Cn_dr, 0.0)
+
+            call jsonx_get(aerodynamics, 'rectilinear_databases', this%db_fn, 'none')
+            if (trim(this%db_fn(1)) /= 'none') then
+                this%n_db = size(this%db_fn)
+                allocate(this%db(this%n_db))
+                call jsonx_get(aerodynamics, 'database_directory', this%db_path, '')
+                call jsonx_get(aerodynamics, 'database_allow_past_saturation', allow_saturation)
+                call jsonx_get(aerodynamics, 'speed_brake[deg]', this%speed_brake)
+                this%speed_brake = this%speed_brake*pi/180.0
+                call jsonx_get(aerodynamics, 'leading_edge_flap[deg]', this%le_flap)
+                this%le_flap = this%le_flap*pi/180.0
+                do i = 1, this%n_db
+                    call this%db(i)%init(this%db_fn(i), pn=this%db_path, verbose=.true., presorted=.true.)
+                    this%db(i)%saturate = allow_saturation
+                end do
+            end if
         
         else if (this%type == 'arrow') then
 
@@ -1124,13 +1152,19 @@ contains
         real :: S_alpha, C_alpha, S_beta, C_beta
         real :: thrust(3), F_g(3), M_g(3)
         real :: CLnewt, CDnewt, Cmnewt, pos, neg, sigma
+        real :: uc(3), lx, ly, lz
+
+        real :: Cxyzlmn(6), db6(6), db3(3), db2(2), db1(1)
+        real :: alphad, betad, ded, speedbrake, lef
+        logical :: verbose_database
 
         !print*, "State vector incoming: ", y
 
         ! Get atmosphere
         call std_atm_English(-y(9), Z, temp, P, rho, a)
         
-        turb = atmosphere_get_turbulence(this%atmosphere, y)
+        !turb = atmosphere_get_turbulence(this%atmosphere, y)
+        turb = 0.0
 
         u = y(1) + turb(1)
         v = y(2) + turb(2)
@@ -1177,6 +1211,136 @@ contains
             C_n = this%Cn_beta*beta + this%Cn_pbar*pbar + this%Cn_alpha_pbar*alpha*pbar + this%Cn_rbar*rbar &
                     + this%Cn_da*da + this%Cn_alpha_da*alpha*da + this%Cn_dr*dr
 
+            ! Add in database aerodynamics
+            Cxyzlmn = 0.0
+            
+            if(allocated(this%db)) then
+                verbose_database = .false.
+                alphad = alpha*180.0/pi
+                betad = beta*180.0/pi
+                ded = de*180.0/pi
+                speedbrake = this%speed_brake
+                lef = this%le_flap
+
+                if(verbose_database) then
+                    write(*,*) 
+                    write(*,*) 'Interpolating in Databases...'
+                    write(*,*) 'alpha[deg] = ', alphad
+                    write(*,*) 'bega[deg] = ', betad
+                    write(*,*) 'aileron[deg] = ', da*180.0/pi
+                    write(*,*) 'elevator[deg] = ', ded
+                    write(*,*) 'rudder[deg] = ', dr*180.0/pi
+                    write(*,*) 'speed brake[deg] = ', speedbrake*180.0/PI
+                    write(*,*) 'LE Flap[deg] = ', lef*180.0/pi
+                    write(*,*) 'pbar  =',pbar
+                    write(*,*) 'qbar  =',qbar
+                    write(*,*) 'rbar  =',rbar
+                    write(*,*) 
+                    write(*,*) 'Database #        Interpolation Result      |       With Multipliers'
+                end if
+
+
+                ! C(x,y,z,l,m,n)o(elevator,alpha,beta)
+                db6 = this%db(1)%interpolate([ded,alphad,betad])
+                Cxyzlmn = Cxyzlmn + db6
+                if (verbose_database) write(*,*) 1, db6, '|'
+
+                ! DC(m)(alpha)
+                db1 = this%db(2)%interpolate([alphad])
+                Cxyzlmn(5) =Cxyzlmn(5) + db1(1)
+                if (verbose_database) write(*,*) 2, db1, '|', db1
+
+                ! DC(m)(elevator,alpha)
+                db1 = this%db(3)%interpolate([ded,alphad])
+                Cxyzlmn(5) =Cxyzlmn(5) + db1(1)
+                if (verbose_database) write(*,*) 3, db1, '|', db1(1)
+
+                ! DC(l,n),beta(alpha)
+                db2(:) = this%db(4)%interpolate([alphad])
+                Cxyzlmn(4) =Cxyzlmn(4) + db2(1)*beta
+                Cxyzlmn(6) =Cxyzlmn(6) + db2(2)*beta
+                if (verbose_database) write(*,*) 4, db2, '|', db2*beta
+
+                ! DC(x,y,z,l,m,n),lef(alpha,beta)
+                db6 = this%db(5)%interpolate([alphad,betad])
+                Cxyzlmn = Cxyzlmn + db6*lef
+                if (verbose_database) write(*,*) 5, db6, '|', db6*lef
+
+                ! DC(x,z,m),qbar_lef(alpha)
+                db3 = this%db(6)%interpolate([alphad])
+                Cxyzlmn(1) = Cxyzlmn(1) + db3(1)*qbar*lef
+                Cxyzlmn(3) = Cxyzlmn(3) + db3(2)*qbar*lef
+                Cxyzlmn(5) = Cxyzlmn(5) + db3(3)*qbar*lef
+                if(verbose_database) write(*,*) 6, db3, '|', db3*qbar*lef
+
+                ! DC(x,z,m),qbar(alpha)
+                db3 = this%db(7)%interpolate([alphad])
+                Cxyzlmn(1) = Cxyzlmn(1) + db3(1)*qbar
+                Cxyzlmn(3) = Cxyzlmn(3) + db3(2)*qbar
+                Cxyzlmn(5) = Cxyzlmn(5) + db3(3)*qbar
+                if(verbose_database) write(*,*) 7, db3, '|', db3*qbar
+
+                ! DC(x,z,m),sb(alpha)
+                db3 = this%db(8)%interpolate([alphad])
+                Cxyzlmn(1) = Cxyzlmn(1) + db3(1)*speedbrake
+                Cxyzlmn(3) = Cxyzlmn(3) + db3(2)*speedbrake
+                Cxyzlmn(5) = Cxyzlmn(5) + db3(3)*speedbrake
+                if(verbose_database) write(*,*) 8, db3, '|', db3*speedbrake
+
+                ! DC(y,l,n),aileron_lef(alpha,beta)
+                db3 = this%db(9)%interpolate([alphad,betad])
+                Cxyzlmn(2) = Cxyzlmn(2) + db3(1)*da*lef
+                Cxyzlmn(4) = Cxyzlmn(4) + db3(2)*da*lef
+                Cxyzlmn(6) = Cxyzlmn(6) + db3(3)*da*lef
+                if(verbose_database) write(*,*) 9, db3, '|', db3*da*lef
+
+                ! DC(y,l,n),aileron(alpha,beta)
+                db3 = this%db(10)%interpolate([alphad,betad])
+                Cxyzlmn(2) = Cxyzlmn(2) + db3(1)*da
+                Cxyzlmn(4) = Cxyzlmn(4) + db3(2)*da
+                Cxyzlmn(6) = Cxyzlmn(6) + db3(3)*da
+                if(verbose_database) write(*,*) 10, db3, '|', db3*da
+
+                ! DC(y,l,n),pbar_lef(alpha)
+                db3 = this%db(11)%interpolate([alphad])
+                Cxyzlmn(2) = Cxyzlmn(2) + db3(1)*pbar*lef
+                Cxyzlmn(4) = Cxyzlmn(4) + db3(2)*pbar*lef
+                Cxyzlmn(6) = Cxyzlmn(6) + db3(3)*pbar*lef
+                if(verbose_database) write(*,*) 11, db3, '|', db3*pbar*lef
+
+                ! DC(y,l,n),pbar(alpha,beta)
+                db3 = this%db(12)%interpolate([alphad])
+                Cxyzlmn(2) = Cxyzlmn(2) + db3(1)*pbar
+                Cxyzlmn(4) = Cxyzlmn(4) + db3(2)*pbar
+                Cxyzlmn(6) = Cxyzlmn(6) + db3(3)*pbar
+                if(verbose_database) write(*,*) 12, db3, '|', db3*pbar
+
+                ! DC(y,l,n),rbar_lef(alpha)
+                db3 = this%db(13)%interpolate([alphad])
+                Cxyzlmn(2) = Cxyzlmn(2) + db3(1)*rbar*lef
+                Cxyzlmn(4) = Cxyzlmn(4) + db3(2)*rbar*lef
+                Cxyzlmn(6) = Cxyzlmn(6) + db3(3)*rbar*lef
+                if(verbose_database) write(*,*) 13, db3, '|', db3*rbar*lef
+
+                ! DC(y,l,n),rbar(alpha,beta)
+                db3 = this%db(14)%interpolate([alphad])
+                Cxyzlmn(2) = Cxyzlmn(2) + db3(1)*rbar
+                Cxyzlmn(4) = Cxyzlmn(4) + db3(2)*rbar
+                Cxyzlmn(6) = Cxyzlmn(6) + db3(3)*rbar
+                if(verbose_database) write(*,*) 14, db3, '|', db3*rbar
+
+                ! DC(y,l,n),rudder(alpha,beta)
+                db3 = this%db(15)%interpolate([alphad,betad])
+                Cxyzlmn(2) = Cxyzlmn(2) + db3(1)*dr
+                Cxyzlmn(4) = Cxyzlmn(4) + db3(2)*dr
+                Cxyzlmn(6) = Cxyzlmn(6) + db3(3)*dr
+                if(verbose_database) write(*,*) 15, db3, '|', db3*dr
+
+                if(verbose_database) write(*,*) 'Dataset Final Cxyzlmn: ', Cxyzlmn(:)
+
+
+            end if
+
             S_alpha = sin(alpha)
             C_alpha = cos(alpha)
             S_beta = sin(beta)
@@ -1205,13 +1369,22 @@ contains
                 C_m = (1.0 - sigma)*C_m + sigma*(Cmnewt)
             end if
 
-            F(1) = 0.5*rho*V_mag**2 * this%S_w * (C_L*S_alpha - C_S*C_alpha*S_beta - C_D*C_alpha*C_beta)
-            F(2) = 0.5*rho*V_mag**2 * this%S_w * (C_S*C_beta - C_D*S_beta)
-            F(3) = 0.5*rho*V_mag**2 * this%S_w * (-C_L*C_alpha - C_S*S_alpha*S_beta - C_D*S_alpha*C_beta)
+            F(1) = (C_L*S_alpha - C_S*C_alpha*S_beta - C_D*C_alpha*C_beta)
+            F(2) = (C_S*C_beta - C_D*S_beta)
+            F(3) = (-C_L*C_alpha - C_S*S_alpha*S_beta - C_D*S_alpha*C_beta)
 
-            M(1) = 0.5*rho*V_mag**2 * this%S_w * (this%b*(C_ell))
-            M(2) = 0.5*rho*V_mag**2 * this%S_w * (this%c*C_m)
-            M(3) = 0.5*rho*V_mag**2 * this%S_w * (this%b*(C_n))
+            M(1) = (this%b*(C_ell))
+            M(2) = (this%c*C_m)
+            M(3) = (this%b*(C_n))
+
+            ! add in database
+            F(1:3) = F(1:3) + Cxyzlmn(1:3)
+            M(1) = M(1) + Cxyzlmn(4)*this%b
+            M(2) = M(2) + Cxyzlmn(5)*this%c
+            M(3) = M(3) + Cxyzlmn(6)*this%b
+
+            F = 0.5*rho*V_mag**2 * this%S_w*F
+            M = 0.5*rho*V_mag**2 * this%S_w*M
 
         else if (this%type == 'arrow') then
 
@@ -1260,6 +1433,16 @@ contains
             F = -0.5 * rho * V_mag**2 * PI * this%b**2 * C_D * (y(1:3)+turb(1:3))/V_mag
             M = 0.0
 
+        else if (this%type == "quadrotor") then
+            uc = y(1:3)/V_mag
+            if(V_mag < 1e-12) uc = [1.0, 0.0, 0.0]
+            lx = this%b
+            ly = this%b
+            lz = this%c
+            this%S_w = ly*lz*abs(uc(1)) + lx*lz*abs(uc(2)) + lx*ly*abs(uc(3))
+            C_D = 1.05
+            F = -0.5 * rho * V_mag**2 * this%S_w * C_D * uc
+            M = 0.0
         end if
 
         ! Apply CG shift to moments
@@ -1288,6 +1471,7 @@ contains
         end if
         
     end subroutine aircraft_pseudo_aero
+
 
     subroutine aircraft_tick_states(this, time, dt)
 
@@ -1337,7 +1521,7 @@ contains
                 dummy_full(1) = time+dt
                 dummy_full(2:22) = this%states(1:21)
                 !call this%datalog_conn%send(dummy_full)
-                if (time > 0.0) then
+                if (time > 9.95) then
                     call this%save_states(this%states, time, dt)
                 end if
                 !this%init_eul = quat_to_euler(this%states(10:13))

@@ -10,6 +10,6 @@ program main
 
     call init(input_file)
 
-    call run()
+    !call run()
 
 end program main

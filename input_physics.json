@@ -175,7 +175,28 @@
                         "lambda_b" : 6.0
                     }
                 },
-                "coefficients" : {
+                "database_directory": "./F16-NASA-Modified-Dataset",
+                "rectilinear_databases": [
+                    "1_C(x,y,z,l,m,n)0(elevator,alpha,beta).csv",
+                    "2_DC(m)(alpha).csv",
+                    "3_DC(m)(elevator,alpha).csv",
+                    "4_C(l,n),beta(alpha).csv",
+                    "5_C(x,y,z,l,m,n),lef(alpha,beta).csv",
+                    "6_C(x,z,m),qbar_lef(alpha).csv",
+                    "7_C(x,z,m),qbar(alpha).csv",
+                    "8_C(x,z,m),sb(alpha).csv",
+                    "9_C(y,l,n),aileron_lef(alpha,beta).csv",
+                    "10_C(y,l,n),aileron(alpha,beta).csv",
+                    "11_C(y,l,n),pbar_lef(alpha).csv",
+                    "12_C(y,l,n),pbar(alpha).csv",
+                    "13_C(y,l,n),rbar_lef(alpha).csv",
+                    "14_C(y,l,n),rbar(alpha).csv",
+                    "15_C(y,l,n),rudder(alpha,beta).csv"
+                ],
+                "database_allow_past_saturation": false,
+                "speed_brake[deg]" : 0.0,
+                "leading_edge_flap[deg]": 0.0,
+                "_coefficients" : {
                     "CL" : {
                         "0" : 0.0535,
                         "alpha" : 3.8459,
@@ -283,8 +304,8 @@
                 "altitude[ft]" : 3000,
                 "latitude[deg]" : 0.0,
                 "longitude[deg]" : 45,
-                "Euler_angles[deg]" : [0.0, 7.973921791130, 0.0],
-                "type" : "state",
+                "Euler_angles[deg]" : [0.0, 0.0, 0.0],
+                "type" : "trim",
                 "state" : {
                     "angle_of_attack[deg]" : 7.973921791130,
                     "sideslip_angle[deg]" : 0.0,
@@ -296,8 +317,8 @@
                 },
                 "trim" : {
                     "type" : "sct",
-                    "relative_climb_angle[deg]" : 0.0,
-                    "_load_factor" : 1.0,
+                    "relative_climb_angle[deg]" : 10.0,
+                    "load_factor" : 1.0,
                     "solver" : {
                         "finite_difference_step_size" : 0.01,
                         "relaxation_factor" : 0.9,
