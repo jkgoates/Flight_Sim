@@ -640,4 +640,17 @@ contains
     end subroutine test_rand_normal
 
 
+    function cross_product(a, b) result(ans)
+
+        implicit none
+        
+        real, intent(in) :: a(3), b(3)
+        real :: ans(3)
+
+        ans(1) = a(2)*b(3) - a(3)*b(2)
+        ans(2) = a(3)*b(1) - a(1)*b(3)
+        ans(3) = a(1)*b(2) - a(2)*b(1)
+
+    end function cross_product
+
 end module goates_m

@@ -1,0 +1,173 @@
+{
+    "simulation" : {
+        "time_step[s]" : 0.01,
+        "end_time[s]" : 9.99999999,
+        "rk4_verbose" : false,
+        "save_states" : true,
+        "geographic_model": "none"
+    },
+    "atmosphere": {
+        "constant_wind[ft/s]": [0.0,0.0,0.0],
+        "turbulence": {
+            "model": "dryden_beal",
+            "wingspan[ft]": 30.0,
+            "hstab_distance[ft]": 15.0,
+            "vstab_distance[ft]": 15.0,
+            "intensity": "severe",
+            "repeatable": false,
+            "xsample": {
+                "save_filename": "turb_sample.csv",
+                "height_above_ground[ft]": 2000,
+                "number_of_points": 80000,
+                "dx[ft]": 5,
+                "psd_analyses": 10
+            }
+        }
+    },
+    "vehicles" : {
+        "quadrotor" : {
+            "type" : "quadrotor",
+            "run_physics" : true,
+            "mass" : {
+                "weight[lbf]" : 5.0,
+                "Ixx[slug-ft^2]" : 0.0231,
+                "Iyy[slug-ft^2]" : 0.0231,
+                "Izz[slug-ft^2]" : 0.0391,
+                "Ixy[slug-ft^2]" : 0.0,
+                "Ixz[slug-ft^2]" : 0.0,
+                "Iyz[slug-ft^2]" : 0.0
+            },
+            "propulsion" : {
+                "prop_1" : {
+                    "type" : "propeller_polynomial",
+                    "location[ft]" : [1.0, 1.0, -0.25],
+                    "orientation[deg]" : [0.0, 90.0, 0.0],
+                    "diameter[ft]" : 1.0,
+                    "Ixx[slug-ft^2]" : 0.000095231,
+                    "rotation" : "RH",
+                    "CT(J)": [0.0560, -0.0704, -0.1027],
+                    "CPb(J)": [0.0137, 0.0144, -0.0850],
+                    "CN,alpha(J)": [0.0, 0.0036, 0.0160, 0.0148],
+                    "Cn,alpha(J)": [0.0, -0.0112, 0.0029, 0.0050]
+                },
+                "prop_2" : {
+                    "type" : "propeller_polynomial",
+                    "location[ft]" : [-1.0, 1.0, -0.25],
+                    "orientation[deg]" : [0.0, 90.0, 0.0],
+                    "diameter[ft]" : 1.0,
+                    "Ixx[slug-ft^2]" : 0.000095231,
+                    "rotation" : "LH",
+                    "CT(J)": [0.0560, -0.0704, -0.1027],
+                    "CPb(J)": [0.0137, 0.0144, -0.0850],
+                    "CN,alpha(J)": [0.0, 0.0036, 0.0160, 0.0148],
+                    "Cn,alpha(J)": [0.0, -0.0112, 0.0029, 0.0050]
+                },
+                "prop_3" : {
+                    "type" : "propeller_polynomial",
+                    "location[ft]" : [-1.0, -1.0, -0.25],
+                    "orientation[deg]" : [0.0, 90.0, 0.0],
+                    "diameter[ft]" : 1.0,
+                    "Ixx[slug-ft^2]" : 0.000095231,
+                    "rotation" : "RH",
+                    "CT(J)": [0.0560, -0.0704, -0.1027],
+                    "CPb(J)": [0.0137, 0.0144, -0.0850],
+                    "CN,alpha(J)": [0.0, 0.0036, 0.0160, 0.0148],
+                    "Cn,alpha(J)": [0.0, -0.0112, 0.0029, 0.0050]
+                },
+                "prop_4" : {
+                    "type" : "propeller_polynomial",
+                    "location[ft]" : [1.0, -1.0, -0.25],
+                    "orientation[deg]" : [0.0, 90.0, 0.0],
+                    "diameter[ft]" : 1.0,
+                    "Ixx[slug-ft^2]" : 0.000095231,
+                    "rotation" : "LH",
+                    "CT(J)": [0.0560, -0.0704, -0.1027],
+                    "CPb(J)": [0.0137, 0.0144, -0.0850],
+                    "CN,alpha(J)": [0.0, 0.0036, 0.0160, 0.0148],
+                    "Cn,alpha(J)": [0.0, -0.0112, 0.0029, 0.0050]
+                }
+            },
+            "aerodynamics" : {
+                "reference" : {
+                    "area[ft^2]" : 0.0,
+                    "longitudinal_length[ft]" : 0.5,
+                    "lateral_length[ft]" : 1.0
+                }
+            },
+            "control_effectors": {
+                "1": {
+                    "name": "prop_1",
+                    "units": "torque[ft-lbf]",
+                    "dynamics_order": 0,
+                    "magnitude_limits": [0.0, 10000.0]
+                },
+                "2": {
+                    "name": "prop_2",
+                    "units": "torque[ft-lbf]",
+                    "dynamics_order": 0,
+                    "magnitude_limits": [0.0, 10000.0]
+                },
+                "3": {
+                    "name": "prop_3",
+                    "units": "torque[ft-lbf]",
+                    "dynamics_order": 0,
+                    "magnitude_limits": [0.0, 10000.0]
+                },
+                "4": {
+                    "name": "prop_4",
+                    "units": "torque[ft-lbf]",
+                    "dynamics_order": 0,
+                    "magnitude_limits": [0.0, 10000.0]
+                }
+            },
+            "initial" : {
+                "airspeed[ft/s]" : 0.0,
+                "altitude[ft]" : 10000,
+                "latitude[deg]" : 0.0,
+                "longitude[deg]" : 45,
+                "Euler_angles[deg]" : [0.0, 0.0, 0.0],
+                "type" : "state",
+                "state" : {
+                    "angle_of_attack[deg]" : 0.0,
+                    "sideslip_angle[deg]" : 0.0,
+                    "p[deg/s]" : 0.0,
+                    "q[deg/s]" : 0.0,
+                    "r[deg/s]" : 0.0,
+                    "_controls": [7000.0, 7000.0, 7000.0, 7000.0],
+                    "__controls": [1.25, 1.25, 1.25, 1.25],
+                    "controls": [0.05, 0.05, 0.05, 0.05]
+                }
+            },
+            "connections": {
+                "datalog": {
+                    "type": "send",
+                    "number_of_values": 22,
+                    "refresh_rate": 50,
+                    "channel_type": "file",
+                    "filename": "datalog.csv"
+                },
+                "states": {
+                    "type": "send",
+                    "channel_type": "udp",
+                    "number_of_values": 13,
+                    "refresh_rate": 1000,
+                    "port_ID": 5006
+                },
+                "graphics": {
+                    "type": "send",
+                    "channel_type": "udp",
+                    "number_of_values": 13,
+                    "refresh_rate": 60,
+                    "port_ID": 5005
+                },
+                "controls":{
+                    "type": "receive",
+                    "channel_type": "udp",
+                    "number_of_values": 4,
+                    "refresh_rate": 1000,
+                    "port_ID": 5007
+                }
+            }
+        }
+    }
+}

@@ -4,6 +4,7 @@ module vehicle_m
     use jsonx_m
     use connection_m
     use atmosphere_m
+    use propulsion_m
     use database_m
 
     implicit none
@@ -74,15 +75,15 @@ module vehicle_m
         ! landing gear
         real, allocatable :: ks(:), kd(:) ! Landing gear spring and damping coefficients
         real, allocatable :: g_b(:,:) ! Landing gear body fixed coordinates
-        real, allocatable :: th_b(:) ! tail hook location
-        real :: ag_ks, ag_kd, ag_length, ag_distance ! arresting gear coefficients
-        logical :: ag_engaged
         real, allocatable :: collision_points(:,:) ! Aircraft collision points
     
         real :: init_V, init_alt
         real, allocatable :: init_eul(:)
 
         type(trim_settings_t) :: trim
+
+        type(propulsion_t), allocatable :: props(:)
+        integer :: num_props
 
         real :: states(21), init_states(21)
         type(control_t) :: controls(4)
@@ -104,7 +105,7 @@ module vehicle_m
         procedure :: init           => aircraft_init
         procedure :: init_to_state  => aircraft_init_to_state
         procedure :: init_to_trim   => aircraft_init_to_trim
-        !procedure :: landing_gear   => aircraft_landing_gear
+        procedure :: landing_gear   => aircraft_landing_gear
         !procedure :: check_collision => aircraft_check_collision
         !procedure :: arresting_gear => aircraft_arresting_gear
         procedure :: print_aero_table => aircraft_print_aero_table
@@ -127,6 +128,7 @@ contains
         type(json_value), pointer, intent(in) :: settings
 
         type(json_value), pointer :: reference, coefficients, aerodynamics, p1, p2, j_initial, j_control, j_control_temp, j_conn
+        type(json_value), pointer :: j_propulsion, j_temp
         real, allocatable :: dummy_loc(:)
         integer :: N, cnt, i
         logical :: found, allow_saturation
@@ -278,28 +280,30 @@ contains
             this%Cm_stall%alpha_s = this%Cm_stall%alpha_s*pi/180.
         end if
 
-        !! Landing Gear
-        !call jsonx_get(settings, "landing_gear", p1)
-        !N = json_value_count(p1)
-        !cnt= 0
-        !do i = 1, N
-            !call json_value_get(p1, i, p2)
-            !if (p2%name(1:1) == 'x') cycle
-            !cnt = cnt+1
-        !end do
-        !allocate(this%ks(cnt))
-        !allocate(this%kd(cnt))
-        !allocate(this%g_b(cnt, 3))
-        !cnt = 1
-        !do i = 1, N
-            !call json_value_get(p1, i, p2)
-            !if (p2%name(1:1) == 'x') cycle
-            !call jsonx_get(p2, "location[ft]", dummy_loc, 0.0, 3)
-            !this%g_b(cnt, :) = dummy_loc
-            !call jsonx_get(p2, "spring_constant[lb/ft]", this%ks(cnt))
-            !call jsonx_get(p2, "damping_constant[lb-s/ft]", this%kd(cnt))
-            !cnt = cnt+1
-        !end do
+        ! Landing Gear
+        call json_get(settings, "landing_gear", p1, found)
+        if (found) then
+            N = json_value_count(p1)
+            cnt= 0
+            do i = 1, N
+                call json_value_get(p1, i, p2)
+                if (p2%name(1:1) == 'x') cycle
+                cnt = cnt+1
+            end do
+            allocate(this%ks(cnt))
+            allocate(this%kd(cnt))
+            allocate(this%g_b(cnt, 3))
+            cnt = 1
+            do i = 1, N
+                call json_value_get(p1, i, p2)
+                if (p2%name(1:1) == 'x') cycle
+                call jsonx_get(p2, "location[ft]", dummy_loc, 0.0, 3)
+                this%g_b(cnt, :) = dummy_loc
+                call jsonx_get(p2, "spring_constant[lb/ft]", this%ks(cnt))
+                call jsonx_get(p2, "damping_constant[lb-s/ft]", this%kd(cnt))
+                cnt = cnt+1
+            end do
+        end if
 
         !! Collision points
         !call jsonx_get(settings, "collision_points", p1)
@@ -328,6 +332,15 @@ contains
         !call jsonx_get(p1, "cable_distance[ft]", this%ag_distance)
         !call jsonx_get(p1, "tail_hook[ft]", this%th_b)
         !this%ag_engaged = .false.
+
+        ! Propulsion
+        call json_get(settings, "propulsion", j_propulsion)
+        this%num_props = json_value_count(j_propulsion)
+        allocate(this%props(this%num_props))
+        do i = 1, this%num_props
+            call json_value_get(j_propulsion, i, j_temp)
+            call propulsion_init(this%props(i), j_temp)
+        end do
 
         ! Controls
         call jsonx_get(settings, 'control_effectors', j_control)
@@ -400,7 +413,7 @@ contains
         class(aircraft), intent(inout) :: this
         type(json_value), pointer, intent(in) :: j_initial
 
-        real :: alpha, beta, p, q, r, da, de, dr, throttle, phi, theta, psi, xf, yf, zf
+        real :: alpha, beta, p, q, r, da, de, dr, throttle, phi, theta, psi, xf, yf, zf, FMh(9)
         real, allocatable :: temp_controls(:)
         integer :: i
         
@@ -415,7 +428,7 @@ contains
         !call jsonx_get(j_initial, "state.throttle", throttle, default_value=0.0)
         this%states = 0.0
 
-        if (this%type == 'aircraft') then
+        if (this%type == 'aircraft' .or. this%type == 'quadrotor') then
             call jsonx_get(j_initial, 'state.controls', temp_controls, 0.0, 4)
             do i = 1,4
                 this%states(i+13) = temp_controls(i)/this%controls(i)%display_units
@@ -449,6 +462,9 @@ contains
         this%states(10:13) = euler_to_quat(this%init_eul)
 
         write(*,*) "INITIAL STATES", this%states
+
+
+        call this%pseudo_aero(this%states, FMh)
 
     end subroutine aircraft_init_to_state
 
@@ -601,6 +617,7 @@ contains
         class(aircraft), intent(inout) :: this
         type(json_value), pointer, intent(in) :: j_control
         integer, intent(in) :: ID
+        integer :: i
 
 
         call jsonx_get(j_control, 'name', this%controls(ID)%name, 'none')
@@ -609,7 +626,8 @@ contains
         if (this%controls(ID)%name == 'aileron') this%aileron_ID=ID+13
         if (this%controls(ID)%name == 'elevator') this%elevator_ID=ID+13
         if (this%controls(ID)%name == 'rudder') this%rudder_ID=ID+13
-        if (this%controls(ID)%name == 'throttle') this%throttle_ID=ID+13
+
+
 
         call jsonx_get(j_control, 'dynamics_order', this%controls(ID)%dynamics_order, 0)
         call jsonx_get(j_control, 'units', this%controls(ID)%units, 'none')
@@ -620,6 +638,13 @@ contains
         end if
         call jsonx_get(j_control, 'magnitude_limits', this%controls(ID)%mag_limit, 0.0, 2)
         this%controls(ID)%mag_limit(:) = this%controls(ID)%mag_limit(:)/this%controls(ID)%display_units
+
+        do i = 1, this%num_props
+            if (this%controls(ID)%name == this%props(i)%name) then
+                this%props(i)%control_ID = ID
+                this%props(i)%units = this%controls(ID)%units
+            end if
+        end do
 
         ! First-Order Dynamics
         if (this%controls(ID)%dynamics_order == 1) then
@@ -741,7 +766,7 @@ contains
         real :: R(N)
 
         integer :: last, i
-        real :: y_temp(21), alpha, beta, dy_dt(21), gravity, a_c, v_f(3), climb_angle, load_factor, F(3), M(3), mass, Inertia(3,3)
+        real :: y_temp(21), alpha, beta, dy_dt(21), gravity, a_c, v_f(3), climb_angle, load_factor, FMh(9), mass, Inertia(3,3)
 
         if (verbose) then
             write(*,*) "     calc_R function called..."
@@ -796,9 +821,9 @@ contains
 
         if (this%trim%solve_load_factor) then
             last = last+1
-            call this%pseudo_aero(y_temp, F, M)
+            call this%pseudo_aero(y_temp, FMh)
             call this%mass_inertia(y_temp, mass, Inertia)
-            load_factor = (F(1)*sin(alpha) - F(3)*cos(alpha))/(mass*(gravity-a_c))
+            load_factor = (FMh(1)*sin(alpha) - FMh(3)*cos(alpha))/(mass*(gravity-a_c))
             if (verbose) write(*,*) "  Load Factor: ", load_factor
             R(last) = this%trim%load_factor - load_factor
         end if
@@ -842,7 +867,7 @@ contains
         real, intent(in) :: y(21)
         real :: dy_dt(21)
 
-        real :: mass, I(3,3), F(3), M(3), g, I_inv(3,3), dummy(3), h(3), a_c
+        real :: mass, I(3,3), FMh(9), F(3), M(3), g, I_inv(3,3), dummy(3), h(3), a_c
         real :: delta, d_delta, dd_delta, wn, zeta
         integer :: j
 
@@ -854,8 +879,12 @@ contains
 
 
         call this%mass_inertia(y, mass, I)
-        call this%pseudo_aero(y, F, M)
+        call this%pseudo_aero(y, FMh)
         call this%gyroscopic(y, h)
+
+        F = FMh(1:3)
+        M = FMh(4:6)
+        h = h + FMh(7:9)
 
         dy_dt = 0.0
 
@@ -1005,55 +1034,77 @@ contains
 
     end function aircraft_thrust
 
-    !subroutine aircraft_landing_gear(this, t, y, F, M)
+    subroutine aircraft_landing_gear(this, y, FMh)
 
-        !implicit none
+        implicit none
         
-        !class(aircraft), intent(in) :: this
-        !real, intent(in) :: t, y(13)
-        !real, intent(out) :: F(3), M(3)
+        class(aircraft), intent(in) :: this
+        real, intent(in) :: y(21)
+        real, intent(out) :: FMh(9)
 
-        !integer :: N, i
-        !real :: dummy_F(3)
-        !real, allocatable :: g_f(:,:), v_b(:,:), v_f(:,:)
+        integer :: N, i
+        real :: dummy_F(3), spring_F, ground_F, F_b(3), M_b(3)
+        real, allocatable :: g_f(:,:), v_b(:,:), v_f(:,:), dz(:), dz_dot(:), g_f_prime(:,:), g_b_prime(:,:)
+        real :: zb_f(3), omega_b(3), omega_f(3), zb_f_dot(3)
 
-        !N = size(this%ks)
+        N = size(this%ks)
 
-        !allocate(g_f(N, 3))
-        !allocate(v_f(N, 3))
-        !allocate(v_b(N, 3))
+        allocate(g_f(N, 3))
+        allocate(v_f(N, 3))
+        allocate(v_b(N, 3))
+        allocate(dz(N))
+        allocate(dz_dot(N))
+        allocate(g_f_prime(N, 3))
+        allocate(g_b_prime(N, 3))
 
-        !! Rotate into earth fixed coordinates
-        !do i = 1, N
-            !g_f(i,:) = quat_dependent_to_base(this%g_b(i,:), y(10:13)) + y(7:9)
-            !v_b(i,1) = y(1) + y(5)*this%g_b(i,3) - y(6)*this%g_b(i,2)
-            !v_b(i,2) = y(2) + y(6)*this%g_b(i,1) - y(4)*this%g_b(i,3)
-            !v_b(i,3) = y(3) + y(4)*this%g_b(i,2) - y(5)*this%g_b(i,1)
-            !v_f(i,:) = quat_dependent_to_base(v_b(i,:), y(10:13))
-        !end do
 
-        !F = 0.0
-        !M = 0.0
+        ! Rotate gear into earth fixed coordinates
+        do i = 1, N
+            g_f(i,:) = quat_dependent_to_base(this%g_b(i,:), y(10:13)) + y(7:9)
+            v_b(i,1) = y(1) + y(5)*this%g_b(i,3) - y(6)*this%g_b(i,2)
+            v_b(i,2) = y(2) + y(6)*this%g_b(i,1) - y(4)*this%g_b(i,3)
+            v_b(i,3) = y(3) + y(4)*this%g_b(i,2) - y(5)*this%g_b(i,1)
+            v_f(i,:) = quat_dependent_to_base(v_b(i,:), y(10:13))
+        end do
+
+        ! Rotate unit vector
+        zb_f = quat_dependent_to_base((/0.0, 0.0, 1.0/), y(10:13))
+
+        ! find rotation vector
+        omega_b = y(4:6)
+        omega_f = quat_dependent_to_base(omega_b, y(10:13))
+        zb_f_dot = cross_product(omega_f, zb_f)
+
+        ! Find displacement
+        do i = 1, N
+            dz(i) = g_f(i,3)/zb_f(3)
+            dz_dot(i) = (zb_f(3)*v_f(i,3) - g_f(i,3)*zb_f_dot(3))/zb_f(3)**2
+            g_f_prime(i,:) = g_f(i,:) - dz(i)*zb_f
+            g_b_prime(i,:) = quat_base_to_dependent(g_f_prime(i,:) - y(7:9), y(10:13))
+        end do
+
+        !write(*,*) "landing gear displacement", dz
     
-        !! Determine spring forces and moments
-        !do i = 1, N 
-            !dummy_F = 0.0
-            !! Only land on deck
-            !if (abs(g_f(i,1)) < 400.0 .and. abs(g_f(i,2)) < 90.0) then 
-                !if (g_f(i,3) > 0.0) then
-                    !dummy_F(3) = - this%ks(i)*g_f(i,3) - this%kd(i)*v_f(i,3)
-                    !!dummy_F(1) = -10.0*v_b(i,1) ! Braking force
-                    !if (dummy_F(3) > 0.0) dummy_F = 0.0
-                    !M(1) = M(1) + (this%g_b(i,2)*dummy_F(3) - this%g_b(i,3)*dummy_F(2))
-                    !M(2) = M(2) + (this%g_b(i,3)*dummy_F(1) - this%g_b(i,1)*dummy_F(3))
-                    !M(3) = M(3) + (this%g_b(i,1)*dummy_F(2) - this%g_b(i,2)*dummy_F(1))
-                    !F = F + dummy_F
-                !end if
-            !end if
-        !end do
+        FMh = 0.0
+        ! Determine spring forces and moments
+        do i = 1, N 
+            if (dz(i) > 0.0) then
+                spring_F = this%ks(i)*dz(i) + this%kd(i)*dz_dot(i)
+                ground_F = max(spring_F*zb_f(3), 0.0)
+                !if (ground_F > 0.0) write(*,*) "   ground_F: ", ground_F
+                F_b = ground_F*quat_base_to_dependent((/0.0, 0.0, -1.0/), y(10:13))
+                !if (ground_F > 0.0) write(*,*) "   F_b: ", F_b
+                M_b = cross_product(g_b_prime(i,:), F_b)
+                FMh(1:3) = FMh(1:3) + F_b
+                FMh(4:6) = FMh(4:6) + M_b                
+            else
+                F_b = 0.0
+                M_b = 0.0
+            end if
+        end do
 
 
-    !end subroutine aircraft_landing_gear
+    end subroutine aircraft_landing_gear
 
 
     !subroutine aircraft_arresting_gear(this, t, y, F, M)
@@ -1135,13 +1186,13 @@ contains
         !end do
     !end function aircraft_check_collision
 
-    subroutine aircraft_pseudo_aero(this,y,F,M)
+    subroutine aircraft_pseudo_aero(this,y,FMh)
 
         implicit none
     
         class(aircraft), intent(inout) :: this
         real, intent(in) :: y(21)
-        real, intent(out) :: F(3), M(3)
+        real, intent(out) :: FMh(9)
 
         real :: Z, Temp, P, rho, a, mu, Re
         real :: C_L1, C_L, C_D, C_S, C_ell, C_m, C_n
@@ -1150,9 +1201,11 @@ contains
         real :: alpha, beta, pbar, qbar, rbar, V_mag, alphahat
         real :: u, v, w, turb(6)
         real :: S_alpha, C_alpha, S_beta, C_beta
-        real :: thrust(3), F_g(3), M_g(3)
+        real :: thrust(3), FMh_gear(9)
         real :: CLnewt, CDnewt, Cmnewt, pos, neg, sigma
         real :: uc(3), lx, ly, lz
+        integer :: throttle_ID,i
+        real :: tau
 
         real :: Cxyzlmn(6), db6(6), db3(3), db2(2), db1(1)
         real :: alphad, betad, ded, speedbrake, lef
@@ -1165,6 +1218,7 @@ contains
         
         !turb = atmosphere_get_turbulence(this%atmosphere, y)
         turb = 0.0
+        FMh = 0.0
 
         u = y(1) + turb(1)
         v = y(2) + turb(2)
@@ -1175,6 +1229,11 @@ contains
         pbar = (0.5/V_mag)*(y(4)+turb(4))*this%b
         qbar = (0.5/V_mag)*(y(5)+turb(5))*this%c
         rbar = (0.5/V_mag)*(y(6)+turb(6))*this%b
+        if (V_mag< 1e-12) then
+            pbar = 0.0
+            qbar = 0.0
+            rbar = 0.0
+        end if
 
         alpha = atan2(w,u)
         !alphahat = (this%c/(2.0*V_mag))*(y(5)+turb(5))
@@ -1369,22 +1428,21 @@ contains
                 C_m = (1.0 - sigma)*C_m + sigma*(Cmnewt)
             end if
 
-            F(1) = (C_L*S_alpha - C_S*C_alpha*S_beta - C_D*C_alpha*C_beta)
-            F(2) = (C_S*C_beta - C_D*S_beta)
-            F(3) = (-C_L*C_alpha - C_S*S_alpha*S_beta - C_D*S_alpha*C_beta)
+            FMh(1) = (C_L*S_alpha - C_S*C_alpha*S_beta - C_D*C_alpha*C_beta)
+            FMh(2) = (C_S*C_beta - C_D*S_beta)
+            FMh(3) = (-C_L*C_alpha - C_S*S_alpha*S_beta - C_D*S_alpha*C_beta)
 
-            M(1) = (this%b*(C_ell))
-            M(2) = (this%c*C_m)
-            M(3) = (this%b*(C_n))
+            FMh(4) = (this%b*(C_ell))
+            FMh(5) = (this%c*C_m)
+            FMh(6) = (this%b*(C_n))
 
             ! add in database
-            F(1:3) = F(1:3) + Cxyzlmn(1:3)
-            M(1) = M(1) + Cxyzlmn(4)*this%b
-            M(2) = M(2) + Cxyzlmn(5)*this%c
-            M(3) = M(3) + Cxyzlmn(6)*this%b
+            FMh(1:3) = FMh(1:3) + Cxyzlmn(1:3)
+            FMh(4) = FMh(4) + Cxyzlmn(4)*this%b
+            FMh(5) = FMh(5) + Cxyzlmn(5)*this%c
+            FMh(6) = FMh(6) + Cxyzlmn(6)*this%b
 
-            F = 0.5*rho*V_mag**2 * this%S_w*F
-            M = 0.5*rho*V_mag**2 * this%S_w*M
+            FMh = 0.5*rho*V_mag**2 * this%S_w*FMh
 
         else if (this%type == 'arrow') then
 
@@ -1404,13 +1462,13 @@ contains
             S_beta = sin(beta)
             C_beta = cos(beta)
 
-            F(1) = 0.5*rho*V_mag**2 * this%S_w * (C_L*S_alpha - C_S*C_alpha*S_beta - C_D*C_alpha*C_beta)
-            F(2) = 0.5*rho*V_mag**2 * this%S_w * (C_S*C_beta - C_D*S_beta)
-            F(3) = 0.5*rho*V_mag**2 * this%S_w * (-C_L*C_alpha - C_S*S_alpha*S_beta - C_D*S_alpha*C_beta)
+            FMh(1) = 0.5*rho*V_mag**2 * this%S_w * (C_L*S_alpha - C_S*C_alpha*S_beta - C_D*C_alpha*C_beta)
+            FMh(2) = 0.5*rho*V_mag**2 * this%S_w * (C_S*C_beta - C_D*S_beta)
+            FMh(3) = 0.5*rho*V_mag**2 * this%S_w * (-C_L*C_alpha - C_S*S_alpha*S_beta - C_D*S_alpha*C_beta)
 
-            M(1) = 0.5*rho*V_mag**2 * this%S_w * (this%b*(C_ell))
-            M(2) = 0.5*rho*V_mag**2 * this%S_w * (this%c*C_m)
-            M(3) = 0.5*rho*V_mag**2 * this%S_w * (this%b*(C_n))
+            FMh(4) = 0.5*rho*V_mag**2 * this%S_w * (this%b*(C_ell))
+            FMh(5) = 0.5*rho*V_mag**2 * this%S_w * (this%c*C_m)
+            FMh(6) = 0.5*rho*V_mag**2 * this%S_w * (this%b*(C_n))
 
         else if (this%type == 'sphere') then
             mu = sutherland_visc_English(temp)
@@ -1430,8 +1488,7 @@ contains
             end if
 
 
-            F = -0.5 * rho * V_mag**2 * PI * this%b**2 * C_D * (y(1:3)+turb(1:3))/V_mag
-            M = 0.0
+            FMh(1:3) = -0.5 * rho * V_mag**2 * PI * this%b**2 * C_D * (y(1:3)+turb(1:3))/V_mag
 
         else if (this%type == "quadrotor") then
             uc = y(1:3)/V_mag
@@ -1441,33 +1498,40 @@ contains
             lz = this%c
             this%S_w = ly*lz*abs(uc(1)) + lx*lz*abs(uc(2)) + lx*ly*abs(uc(3))
             C_D = 1.05
-            F = -0.5 * rho * V_mag**2 * this%S_w * C_D * uc
-            M = 0.0
+            FMh(1:3) = -0.5 * rho * V_mag**2 * this%S_w * C_D * uc
         end if
 
         ! Apply CG shift to moments
-        M(1) = M(1) + (this%CG_shift(2)*F(3) - this%CG_shift(3)*F(2))
-        M(2) = M(2) + (this%CG_shift(3)*F(1) - this%CG_shift(1)*F(3))
-        M(3) = M(3) + (this%CG_shift(1)*F(2) - this%CG_shift(2)*F(1))
+        FMh(4) = FMh(4) + (this%CG_shift(2)*FMh(3) - this%CG_shift(3)*FMh(2))
+        FMh(5) = FMh(5) + (this%CG_shift(3)*FMh(1) - this%CG_shift(1)*FMh(3))
+        FMh(6) = FMh(6) + (this%CG_shift(1)*FMh(2) - this%CG_shift(2)*FMh(1))
 
-        ! Add thrust influence
-        thrust = this%thrust(y, throttle)
-        F = F + thrust
-        M(1) = M(1) + (this%t_location(2)*thrust(3) - this%t_location(3)*thrust(2))
-        M(2) = M(2) + (this%t_location(3)*thrust(1) - this%t_location(1)*thrust(3))
-        M(3) = M(3) + (this%t_location(1)*thrust(2) - this%t_location(2)*thrust(1))
+
+        do i = 1, this%num_props
+            throttle_ID = this%props(i)%control_ID
+            if(this%limit_controls) then
+                tau = max(this%controls(throttle_ID)%mag_limit(1), min(this%controls(throttle_ID)%mag_limit(2), y(throttle_ID+13)))
+            else
+                tau = y(throttle_ID+13)
+            end if
+            FMh(:) = FMh(:) + propulsion_get_FMh(this%props(i), y, tau)
+        end do
+
+        !! Add thrust influence
+        !thrust = this%thrust(y, throttle)
+        !F = F + thrust
+        !M(1) = M(1) + (this%t_location(2)*thrust(3) - this%t_location(3)*thrust(2))
+        !M(2) = M(2) + (this%t_location(3)*thrust(1) - this%t_location(1)*thrust(3))
+        !M(3) = M(3) + (this%t_location(1)*thrust(2) - this%t_location(2)*thrust(1))
 
         ! Add landing gear influence
-        !call this%landing_gear(t, y, F_g, M_g)
-        !F = F + F_g
-        !M = M + M_g
-        !call this%arresting_gear(t, y, F_g, M_g)
-        !F = F + F_g
-        !M = M + M_g
+        if (allocated(this%ks)) then
+            call this%landing_gear(y, FMh_gear)
+            FMh = FMh + FMh_gear
+        end if
         
         if (verbose) then
-            write(*,'(A,3ES20.12)') "F: ", F
-            write(*,'(A,3ES20.12)') "M: ", M
+            write(*,'(A,3ES20.12)') "F: ", FMh
         end if
         
     end subroutine aircraft_pseudo_aero
@@ -1521,9 +1585,7 @@ contains
                 dummy_full(1) = time+dt
                 dummy_full(2:22) = this%states(1:21)
                 !call this%datalog_conn%send(dummy_full)
-                if (time > 9.95) then
-                    call this%save_states(this%states, time, dt)
-                end if
+                call this%save_states(this%states, time, dt)
                 !this%init_eul = quat_to_euler(this%states(10:13))
                 !write(io_unit,'(ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12, &
                                 !A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.12,A,ES20.7,A,ES20.7,A,ES20.7)') &
@@ -1641,7 +1703,7 @@ contains
         class(aircraft), intent(inout) :: this
         real, intent(in) :: V, H
         integer :: i, iunit
-        real :: alpha, beta, states(21), F(3), M(3), Ax, N, Y
+        real :: alpha, beta, states(21), FMh(9), Ax, N, Y
         real :: ca, cb, sa, sb
         real :: CL, CD, Cm
         real :: Z,T,P,rho,a, mu, const
@@ -1666,10 +1728,10 @@ contains
             states(3) = V*sin(alpha)*cos(beta)
             states(9) = -H
 
-            call this%pseudo_aero(states, F, M)
-            Ax = -F(1)
-            Y = F(2)
-            N = -F(3)
+            call this%pseudo_aero(states, FMh)
+            Ax = -FMh(1)
+            Y = FMh(2)
+            N = -FMh(3)
 
             ca = cos(alpha)
             cb = cos(beta)
@@ -1678,7 +1740,7 @@ contains
 
             CL = N*ca - Ax*sa
             CD = Ax*ca*cb - Y*sb + N*sa*cb
-            Cm = M(2)
+            Cm = FMh(5)
 
             CL = CL/const
             CD = CD/const

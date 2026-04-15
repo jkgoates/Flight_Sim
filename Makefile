@@ -13,7 +13,7 @@ COMMON_FILES = json.f90 jsonx.f90 linalg.f90 micro_time.f90 database_m.f90 udp_w
 COMMON_PATHS = $(addprefix $(COM_DIR)/, $(COMMON_FILES))
 
 # List source files (ordered based on dependency)
-SRC_FILES = goates.f90 atmosphere.f90 aircraft.f90 sim.f90
+SRC_FILES = goates.f90 atmosphere.f90 propulsion.f90 aircraft.f90 sim.f90
 SRC_PATHS = $(addprefix $(SRC_DIR)/, $(SRC_FILES))
 
 # Main
