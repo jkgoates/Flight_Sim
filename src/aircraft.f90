@@ -75,6 +75,7 @@ module vehicle_m
         ! landing gear
         real, allocatable :: ks(:), kd(:) ! Landing gear spring and damping coefficients
         real, allocatable :: g_b(:,:) ! Landing gear body fixed coordinates
+        real, allocatable :: lat_fric(:), long_fric(:)
         real, allocatable :: collision_points(:,:) ! Aircraft collision points
     
         real :: init_V, init_alt
@@ -292,6 +293,8 @@ contains
             end do
             allocate(this%ks(cnt))
             allocate(this%kd(cnt))
+            allocate(this%lat_fric(cnt))
+            allocate(this%long_fric(cnt))
             allocate(this%g_b(cnt, 3))
             cnt = 1
             do i = 1, N
@@ -301,6 +304,8 @@ contains
                 this%g_b(cnt, :) = dummy_loc
                 call jsonx_get(p2, "spring_constant[lb/ft]", this%ks(cnt))
                 call jsonx_get(p2, "damping_constant[lb-s/ft]", this%kd(cnt))
+                call jsonx_get(p2, "lateral_friction", this%lat_fric(cnt), 0.0)
+                call jsonx_get(p2, "longitudinal_friction", this%long_fric(cnt), 0.0)
                 cnt = cnt+1
             end do
         end if
@@ -399,8 +404,8 @@ contains
         !call jsonx_get(j_conn, "datalog", p1)
         !call this%datalog_conn%init(p1)
         !write(*,*) "datalog connection initialized"
-        !call jsonx_get(j_conn, "graphics", p1)
-        !call this%graphics_conn%init(p1)
+        call jsonx_get(j_conn, "graphics", p1)
+        call this%graphics_conn%init(p1)
         !write(*,*) "datalog connection initialized"
 
         this%atmosphere%prev_xyz(:) = this%states(7:9)
@@ -1043,9 +1048,9 @@ contains
         real, intent(out) :: FMh(9)
 
         integer :: N, i
-        real :: dummy_F(3), spring_F, ground_F, F_b(3), M_b(3)
+        real :: dummy_F(3), spring_F, ground_F, F_b(3), M_b(3), lat_fric_F, long_fric_F
         real, allocatable :: g_f(:,:), v_b(:,:), v_f(:,:), dz(:), dz_dot(:), g_f_prime(:,:), g_b_prime(:,:)
-        real :: zb_f(3), omega_b(3), omega_f(3), zb_f_dot(3)
+        real :: xb_f(3), yb_f(3), zb_f(3), omega_b(3), omega_f(3), zb_f_dot(3), xb_f_plane(3), yb_f_plane(3)
 
         N = size(this%ks)
 
@@ -1068,7 +1073,13 @@ contains
         end do
 
         ! Rotate unit vector
+        xb_f = quat_dependent_to_base((/1.0, 0.0, 0.0/), y(10:13))
+        yb_f = quat_dependent_to_base((/0.0, 1.0, 0.0/), y(10:13))
         zb_f = quat_dependent_to_base((/0.0, 0.0, 1.0/), y(10:13))
+        xb_f_plane = (/yb_f(1), yb_f(2), 0.0/)
+        xb_f_plane = yb_f_plane/norm2(yb_f_plane)
+        yb_f_plane = (/yb_f(1), yb_f(2), 0.0/)
+        yb_f_plane = yb_f_plane/norm2(yb_f_plane)
 
         ! find rotation vector
         omega_b = y(4:6)
@@ -1091,8 +1102,14 @@ contains
             if (dz(i) > 0.0) then
                 spring_F = this%ks(i)*dz(i) + this%kd(i)*dz_dot(i)
                 ground_F = max(spring_F*zb_f(3), 0.0)
+                lat_fric_F = -sign(1.0, y(2))*ground_F*this%lat_fric(i)
+                long_fric_F = -sign(1.0, y(1))*ground_F*this%long_fric(i)
+                if (abs(y(2)) < 1e-8) lat_fric_F = 0.0
+                if (abs(y(1)) < 1e-6) long_fric_F = 0.0
                 !if (ground_F > 0.0) write(*,*) "   ground_F: ", ground_F
                 F_b = ground_F*quat_base_to_dependent((/0.0, 0.0, -1.0/), y(10:13))
+                F_b = F_b + lat_fric_F*quat_base_to_dependent((/yb_f_plane(1), yb_f_plane(2), 0.0/), y(10:13))
+                F_b = F_b + long_fric_F*quat_base_to_dependent((/xb_f_plane(1), xb_f_plane(2), 0.0/), y(10:13))
                 !if (ground_F > 0.0) write(*,*) "   F_b: ", F_b
                 M_b = cross_product(g_b_prime(i,:), F_b)
                 FMh(1:3) = FMh(1:3) + F_b
@@ -1598,7 +1615,7 @@ contains
             dummy(2:10) = this%states(1:9)
             dummy(11:13) = quat_to_euler(this%states(10:13))
             !call this%states_conn%send(dummy)
-            !call this%graphics_conn%send(dummy)
+            call this%graphics_conn%send(dummy)
 
             !controls_dummy = this%controls_conn%recv()
             !do i = 1, 4

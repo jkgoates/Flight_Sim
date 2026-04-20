@@ -1,6 +1,6 @@
 {
     "simulation" : {
-        "time_step[s]" : 0.01,
+        "time_step[s]" : 0.0,
         "end_time[s]" : 5.0,
         "rk4_verbose" : false,
         "save_states" : true,
@@ -13,8 +13,8 @@
             "wingspan[ft]": 30.0,
             "hstab_distance[ft]": 15.0,
             "vstab_distance[ft]": 15.0,
-            "intensity": "severe",
-            "repeatable": false,
+            "intensity": "light",
+            "repeatable": true,
             "xsample": {
                 "save_filename": "turb_sample.csv",
                 "height_above_ground[ft]": 2000,
@@ -156,17 +156,23 @@
                 "back_right":{
                     "location[ft]" : [-4.0,3.0,5.0],
                     "spring_constant[lb/ft]": 20000,
-                    "damping_constant[lb-s/ft]": 2000
+                    "damping_constant[lb-s/ft]": 2000,
+                    "lateral_friction": 0.5,
+                    "longitudinal_friction": 0.0
                 },
                 "back_left":{
                     "location[ft]" : [-4.0,-3.0,5.0],
                     "spring_constant[lb/ft]": 20000,
-                    "damping_constant[lb-s/ft]": 2000
+                    "damping_constant[lb-s/ft]": 2000,
+                    "lateral_friction": 0.5,
+                    "longitudinal_friction": 0.0
                 },
                 "front":{
                     "location[ft]" : [8.0,0.0,5.0],
                     "spring_constant[lb/ft]": 20000,
-                    "damping_constant[lb-s/ft]": 2000
+                    "damping_constant[lb-s/ft]": 2000,
+                    "lateral_friction": 0.1,
+                    "longitudinal_friction": 0.0
                 }
             },
             "aerodynamics" : {
@@ -321,7 +327,7 @@
             },
             "initial" : {
                 "airspeed[ft/s]" : 200,
-                "altitude[ft]" : 20,
+                "altitude[ft]" : 50,
                 "latitude[deg]" : 0.0,
                 "longitude[deg]" : 45,
                 "Euler_angles[deg]" : [0.0, 0.0, 0.0],
@@ -336,8 +342,9 @@
                     
                 },
                 "trim" : {
-                    "type" : "sct",
-                    "relative_climb_angle[deg]" : -2.0,
+                    "type" : "shss",
+                    "sideslip_angle[deg]": 0.0,
+                    "relative_climb_angle[deg]" : -5.0,
                     "_load_factor" : 1.0,
                     "solver" : {
                         "finite_difference_step_size" : 0.01,
