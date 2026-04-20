@@ -69,9 +69,10 @@ contains
         real :: ans(9)
         real :: Vc(3), Vc_mag, uc(3), vN(3), vN_mag, uN(3)
         real :: Fc(3), Mc(3)
-        real :: Thrust, Normal, Torque, Yaw, hxx
+        real :: Thrust, Normal, Torque, Yaw, hxx, Torque_s, Torque_m
         real :: Z_dum, T_dum, P_dum, rho, rho0, a_dum, mu_dum, dyp
-        real :: Hz, omega, J, alpha_c
+        real :: Hz, omega, J, alpha_c, N_r, N_m, error, I_m, eta_c, B, C, E_m, E_b, I_b
+
 
         Vc = quat_base_to_dependent(states(1:3)+cross_product(states(4:6), this%location), this%orientation_quat)
         Vc_mag = norm2(Vc)
@@ -107,6 +108,36 @@ contains
                     omega = -Vc_mag*this%CP_J(2) + sqrt(Vc_mag**2*this%CP_J(2)**2 - 4.0*this%CP_J(1)*(Vc_mag**2*this%CP_J(3) - tau*2.0*pi/rho/this%diameter**3))
                     omega = omega*PI/this%diameter/this%CP_J(1)
                     Hz = omega/2.0/pi
+                case("throttle")
+                    N_r = 1000
+                    error = 1.0
+                    do while(abs(error) > 1e-12)
+                        write(*,*) "N_r [rpm]: ", N_r
+                        Hz = N_r/60.0
+                        omega = Hz*2*pi
+                        J = 2.0*PI*Vc_mag/omega/this%diameter
+                        Torque = calc_polynomial(this%CP_J, J) * rho *(Hz**3)*(this%diameter**5) / omega
+                        Torque_s = Torque
+                        Torque_m = Torque_s ! Gear ratio of 1
+                        I_m = Torque_m*450/7.04319971369755 + 0.3
+                        eta_c = 1-0.078*(1-tau)
+                        B = 2*I_m*0.01 - tau*22.2 + tau**2*I_m*0.025/eta_c
+                        C = I_m**2*0.01**2 - tau*22.2*I_m*0.01
+                        E_m = 0.5*(-B + sqrt(B**2 - 4*C))
+                        N_m = 450*(E_m - I_m*0.12)
+                        write(*,*) "N_s [rpm]: ", N_m
+                        error = N_m - N_r
+                        write(*,*) "error: ", error
+                        N_r = N_r + 0.9*(N_m - N_r)
+                    end do
+
+                    E_b = 0.5*(22.2 + sqrt(22.2**2 - 4*E_m*I_m*0.025/eta_c))
+                    I_b = E_m*I_m/(eta_c*E_b)
+                    
+                    write(*,*) "E_m: ", E_m, "volts"
+                    write(*,*) "I_m: ", I_m, "amps"
+                    write(*,*) "E_b: ", E_b, "volts"
+                    write(*,*) "I_b: ", I_b, "amps"
                 end select
 
                 J = 2.0*PI*Vc_mag/omega/this%diameter
@@ -125,10 +156,10 @@ contains
                     Yaw = 0.0
                     hxx = 0.0
                 end if
-                !write(*,*) " Thrust: ", Thrust
-                !write(*,*) " Torque: ", Torque
-                !write(*,*) " Normal: ", Normal
-                !write(*,*) " Yaw: ", Yaw
+                write(*,*) " Thrust: ", Thrust
+                write(*,*) " Torque: ", Torque
+                write(*,*) " Normal: ", Normal
+                write(*,*) " Yaw: ", Yaw
 
         end select
 

@@ -1,0 +1,7 @@
+Motor voltage and current for converged solution
+E_m:    10.146848058088754      volts
+I_m:    4.2033974536569136      amps
+
+Battery voltage and current for converged solution
+E_b:    22.149743549185480      volts
+I_b:    2.0102580325807353      amps

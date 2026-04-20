@@ -42,7 +42,7 @@
                     "type" : "propeller_polynomial",
                     "location[ft]" : [1.0, 1.0, -0.25],
                     "orientation[deg]" : [0.0, 90.0, 0.0],
-                    "diameter[ft]" : 1.0,
+                    "diameter[ft]" : 1.25,
                     "Ixx[slug-ft^2]" : 0.000095231,
                     "rotation" : "RH",
                     "CT(J)": [0.0560, -0.0704, -0.1027],
@@ -54,7 +54,7 @@
                     "type" : "propeller_polynomial",
                     "location[ft]" : [-1.0, 1.0, -0.25],
                     "orientation[deg]" : [0.0, 90.0, 0.0],
-                    "diameter[ft]" : 1.0,
+                    "diameter[ft]" : 1.25,
                     "Ixx[slug-ft^2]" : 0.000095231,
                     "rotation" : "LH",
                     "CT(J)": [0.0560, -0.0704, -0.1027],
@@ -66,7 +66,7 @@
                     "type" : "propeller_polynomial",
                     "location[ft]" : [-1.0, -1.0, -0.25],
                     "orientation[deg]" : [0.0, 90.0, 0.0],
-                    "diameter[ft]" : 1.0,
+                    "diameter[ft]" : 1.25,
                     "Ixx[slug-ft^2]" : 0.000095231,
                     "rotation" : "RH",
                     "CT(J)": [0.0560, -0.0704, -0.1027],
@@ -78,7 +78,7 @@
                     "type" : "propeller_polynomial",
                     "location[ft]" : [1.0, -1.0, -0.25],
                     "orientation[deg]" : [0.0, 90.0, 0.0],
-                    "diameter[ft]" : 1.0,
+                    "diameter[ft]" : 1.25,
                     "Ixx[slug-ft^2]" : 0.000095231,
                     "rotation" : "LH",
                     "CT(J)": [0.0560, -0.0704, -0.1027],
@@ -97,19 +97,19 @@
             "control_effectors": {
                 "1": {
                     "name": "prop_1",
-                    "units": "torque[ft-lbf]",
+                    "units": "throttle",
                     "dynamics_order": 0,
                     "magnitude_limits": [0.0, 10000.0]
                 },
                 "2": {
                     "name": "prop_2",
-                    "units": "torque[ft-lbf]",
+                    "units": "throttle",
                     "dynamics_order": 0,
                     "magnitude_limits": [0.0, 10000.0]
                 },
                 "3": {
                     "name": "prop_3",
-                    "units": "torque[ft-lbf]",
+                    "units": "throttle",
                     "dynamics_order": 0,
                     "magnitude_limits": [0.0, 10000.0]
                 },
@@ -122,7 +122,7 @@
             },
             "initial" : {
                 "airspeed[ft/s]" : 0.0,
-                "altitude[ft]" : 10000,
+                "altitude[ft]" : 10000.0,
                 "latitude[deg]" : 0.0,
                 "longitude[deg]" : 45,
                 "Euler_angles[deg]" : [0.0, 0.0, 0.0],
@@ -135,7 +135,7 @@
                     "r[deg/s]" : 0.0,
                     "_controls": [7000.0, 7000.0, 7000.0, 7000.0],
                     "__controls": [1.25, 1.25, 1.25, 1.25],
-                    "controls": [0.05, 0.05, 0.05, 0.05]
+                    "controls": [0.46, 0.46, 0.46, 0.0032448999692]
                 }
             },
             "connections": {
