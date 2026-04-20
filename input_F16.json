@@ -327,7 +327,7 @@
             },
             "initial" : {
                 "airspeed[ft/s]" : 200,
-                "altitude[ft]" : 50,
+                "altitude[ft]" : 20,
                 "latitude[deg]" : 0.0,
                 "longitude[deg]" : 45,
                 "Euler_angles[deg]" : [0.0, 0.0, 0.0],
@@ -344,7 +344,7 @@
                 "trim" : {
                     "type" : "shss",
                     "sideslip_angle[deg]": 0.0,
-                    "relative_climb_angle[deg]" : -5.0,
+                    "relative_climb_angle[deg]" : -2.0,
                     "_load_factor" : 1.0,
                     "solver" : {
                         "finite_difference_step_size" : 0.01,
