@@ -1089,6 +1089,7 @@ contains
         ! Find displacement
         do i = 1, N
             dz(i) = g_f(i,3)/zb_f(3)
+            
             dz_dot(i) = (zb_f(3)*v_f(i,3) - g_f(i,3)*zb_f_dot(3))/zb_f(3)**2
             g_f_prime(i,:) = g_f(i,:) - dz(i)*zb_f
             g_b_prime(i,:) = quat_base_to_dependent(g_f_prime(i,:) - y(7:9), y(10:13))
@@ -1099,7 +1100,7 @@ contains
         FMh = 0.0
         ! Determine spring forces and moments
         do i = 1, N 
-            if (dz(i) > 0.0) then
+            if (g_f(i,3) > 0.0) then
                 spring_F = this%ks(i)*dz(i) + this%kd(i)*dz_dot(i)
                 ground_F = max(spring_F*zb_f(3), 0.0)
                 lat_fric_F = -sign(1.0, y(2))*ground_F*this%lat_fric(i)

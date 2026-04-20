@@ -1,7 +1,7 @@
 {
     "simulation" : {
         "time_step[s]" : 0.0,
-        "end_time[s]" : 5.0,
+        "end_time[s]" : 10.0,
         "rk4_verbose" : false,
         "save_states" : true,
         "geographic_model": "none"
@@ -342,8 +342,7 @@
                     
                 },
                 "trim" : {
-                    "type" : "shss",
-                    "sideslip_angle[deg]": 0.0,
+                    "type" : "sct",
                     "relative_climb_angle[deg]" : -2.0,
                     "_load_factor" : 1.0,
                     "solver" : {
