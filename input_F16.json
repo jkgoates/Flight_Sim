@@ -156,23 +156,17 @@
                 "back_right":{
                     "location[ft]" : [-4.0,3.0,5.0],
                     "spring_constant[lb/ft]": 20000,
-                    "damping_constant[lb-s/ft]": 2000,
-                    "lateral_friction": 0.0,
-                    "longitudinal_friction": 0.0
+                    "damping_constant[lb-s/ft]": 2000
                 },
                 "back_left":{
                     "location[ft]" : [-4.0,-3.0,5.0],
                     "spring_constant[lb/ft]": 20000,
-                    "damping_constant[lb-s/ft]": 2000,
-                    "lateral_friction": 0.0,
-                    "longitudinal_friction": 0.0
+                    "damping_constant[lb-s/ft]": 2000
                 },
                 "front":{
                     "location[ft]" : [8.0,0.0,5.0],
                     "spring_constant[lb/ft]": 20000,
-                    "damping_constant[lb-s/ft]": 2000,
-                    "lateral_friction": 0.0,
-                    "longitudinal_friction": 0.0
+                    "damping_constant[lb-s/ft]": 2000
                 }
             },
             "aerodynamics" : {
