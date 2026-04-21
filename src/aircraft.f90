@@ -1073,29 +1073,22 @@ contains
         end do
 
         ! Rotate unit vector
-        xb_f = quat_dependent_to_base((/1.0, 0.0, 0.0/), y(10:13))
-        yb_f = quat_dependent_to_base((/0.0, 1.0, 0.0/), y(10:13))
         zb_f = quat_dependent_to_base((/0.0, 0.0, 1.0/), y(10:13))
-        !xb_f_plane = (/yb_f(1), yb_f(2), 0.0/)
-        !xb_f_plane = yb_f_plane/norm2(yb_f_plane)
-        !yb_f_plane = (/yb_f(1), yb_f(2), 0.0/)
-        !yb_f_plane = yb_f_plane/norm2(yb_f_plane)
 
-        ! find rotation vector
+        ! Find rotation vector
         omega_b = y(4:6)
         omega_f = quat_dependent_to_base(omega_b, y(10:13))
+        ! Find derivative of unit vector
         zb_f_dot = cross_product(omega_f, zb_f)
 
         ! Find displacement
         do i = 1, N
             dz(i) = g_f(i,3)/zb_f(3)
-            
             dz_dot(i) = (zb_f(3)*v_f(i,3) - g_f(i,3)*zb_f_dot(3))/zb_f(3)**2
             g_f_prime(i,:) = g_f(i,:) - dz(i)*zb_f
             g_b_prime(i,:) = quat_base_to_dependent(g_f_prime(i,:) - y(7:9), y(10:13))
         end do
 
-    
         FMh = 0.0
         ! Determine spring forces and moments
         do i = 1, N 
@@ -1103,12 +1096,6 @@ contains
                 spring_F = this%ks(i)*dz(i) + this%kd(i)*dz_dot(i)
                 ground_F = max(spring_F*zb_f(3), 0.0)
                 F_b = ground_F*quat_base_to_dependent((/0.0, 0.0, -1.0/), y(10:13))
-                !lat_fric_F = -sign(1.0, y(2))*ground_F*this%lat_fric(i)
-                !long_fric_F = -sign(1.0, y(1))*ground_F*this%long_fric(i)
-                !if (abs(y(2)) < 1e-8) lat_fric_F = 0.0
-                !if (abs(y(1)) < 1e-6) long_fric_F = 0.0
-                !F_b = F_b + lat_fric_F*quat_base_to_dependent((/yb_f_plane(1), yb_f_plane(2), 0.0/), y(10:13))
-                !F_b = F_b + long_fric_F*quat_base_to_dependent((/xb_f_plane(1), xb_f_plane(2), 0.0/), y(10:13))
                 M_b = cross_product(g_b_prime(i,:), F_b)
                 FMh(1:3) = FMh(1:3) + F_b
                 FMh(4:6) = FMh(4:6) + M_b                
